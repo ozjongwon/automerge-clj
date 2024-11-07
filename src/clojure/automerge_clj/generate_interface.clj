@@ -1,7 +1,9 @@
 (ns clojure.automerge-clj.generate-interface
   (:require [clojure.data.priority-map :refer [priority-map]]
             [clojure.set :as set]
-            [clojure.string :as str])
+            [clojure.string :as str]
+            [clojure.pprint :as pp]
+            [clojure.java.io :as io])
   (:import [org.automerge AutomergeSys Document ObjectId ChangeHash ObjectType
             PatchLog SyncState Transaction]
            [java.util Optional List]))
@@ -40,19 +42,19 @@
 (defn- generate-a-function [java-fn java-class def]
   (let [[fn-name return-type type+args] def
         [types args] (split-type+args type+args)]
-    (spit "/tmp/ex.clj"
-          (with-out-str
-            (println `(~'defn ~@(when-let [result (canonical-type return-type)]
-                                  `(~result))
-                       ~fn-name
-                       [~@(make-main-instance-arg java-class)
-                        ~@(mapcat (fn [type arg]
-                                    (list (canonical-type type) arg))
-                                  types args)]
-                       (. ~(str/lower-case java-class)
-                          ~java-fn
-                          ~@args))))
-          :append true)))
+    (with-open [out (io/writer "/tmp/ex.clj" :append true)]
+      (pp/cl-format out "(defn ~{~A~} ~A [~{~A~^ ~}]~%~2T(. ~{~A~^ ~}))~2&"
+                    (when-let [result (canonical-type return-type)]
+                      result)
+                    fn-name
+                    `(~@(make-main-instance-arg java-class)
+                      ~@(mapcat (fn [type arg]
+                                  (list (canonical-type type) arg))
+                                types args))
+                    `(~(str/lower-case java-class)
+                      ~java-fn
+                      ~@args)))))
+
 ;; (clojure.core/defn
 ;;   document-generate-sync-message
 ;;   Optional
