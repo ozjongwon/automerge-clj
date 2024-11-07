@@ -12,5 +12,4 @@
   :java-source-paths ["src/java"]
   :profiles {:precomp {:source-paths ["src/java"]
                        :aot [org.automerge] }}
-  ;; :aliases ["generate-map" ["run" "bash" "-c" "source src/python/python-env/bin/activate && python3 src/python/parse-java.py"]]
-  )
+  :aliases {"generate-map" ["run" "bash" "-c" "source src/python/python-env/bin/activate && python3 src/python/parse-java.py"]})

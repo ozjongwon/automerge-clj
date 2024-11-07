@@ -88,7 +88,7 @@ def format_clojure_list(class_info: Tuple[str, List]) -> str:
         if method[0] == 'constructor':
             # Format constructor
             _, _, params = method
-            param_str = ' '.join(f"[[{param_type} {param_name}]]" for param_type, param_name in params)
+            param_str = ' '.join(f"[{param_type} {param_name}]" for param_type, param_name in params)
             constructor_name = f"make-{pascal_to_kebab(class_name)}"
 
             # Add the original name and formatted definition
@@ -97,7 +97,7 @@ def format_clojure_list(class_info: Tuple[str, List]) -> str:
         else:
             # Format regular method
             _, original_name, params, return_type = method
-            param_str = ' '.join(f"[[{param_type} {param_name}]]" for param_type, param_name in params)
+            param_str = ' '.join(f"[{param_type} {param_name}]" for param_type, param_name in params)
             formatted_name = f"{pascal_to_kebab(class_name)}-{pascal_to_kebab(original_name)}"
 
             # Add the original name and formatted definition
