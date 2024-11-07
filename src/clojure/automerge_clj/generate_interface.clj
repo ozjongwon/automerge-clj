@@ -52,7 +52,7 @@
         :else (throw (ex-info "Unknown type" {:type type}))))
 
 (defn- make-main-instance-arg [java-class]
-  [(canonical-type java-class) (str/lower-case java-class)])
+  [(canonical-type java-class) (symbol (str/lower-case java-class))])
 
 (defn- generate-a-function [java-fn java-class def]
   (let [[fn-name return-type type+args] def
@@ -124,10 +124,11 @@
     `[(~'and ~@conditions)
       (. ~obj ~java-fn ~@(mapcat (fn [[type arg]] [(str type) arg]) arg-names))]))
 
-(defn- make-arity-method [java-fn obj methods arity]
+(defn- make-arity-method [java-fn java-class methods arity]
   (let [arg-symbols (map #(symbol (str "arg" (inc %))) (range arity))
-        cond-clauses (mapcat #(make-cond-clause java-fn obj %) methods)]
-    `([~@arg-symbols]
+        [main-obj-type main-obj] (make-main-instance-arg java-class)
+        cond-clauses (mapcat #(make-cond-clause java-fn main-obj %) methods)]
+    `([~main-obj-type ~main-obj ~@arg-symbols]
       (~'cond ~@cond-clauses
        :else (throw (ex-info "Type error"
                              ~(zipmap (map #(symbol (str "arg" (inc %)))
@@ -135,10 +136,10 @@
                                       arg-symbols)))))))
 
 (defn- generate-complex-multiple-arity-functions [java-fn java-class defs]
-  (let [method-name (ffirst methods)
-        grouped (group-by-arity methods)
+  (let [method-name (ffirst defs)
+        grouped (group-by-arity defs)
         arity-methods (map (fn [[arity methods]]
-                             (make-arity-method java-fn obj methods arity))
+                             (make-arity-method java-fn java-class methods arity))
                            grouped)]
     `(~'defn ~method-name
       ~@arity-methods)))
@@ -176,8 +177,6 @@
     (binding [*out* out]
       (doseq [l *1]
         (println l)))))
-****  get Document
-
 
 [(document-get Optional ([ObjectId obj] [String key]))
  (document-get Optional ([ObjectId obj] [int key]))
