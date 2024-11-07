@@ -42,8 +42,8 @@
 (defn- generate-a-function [java-fn java-class def]
   (let [[fn-name return-type type+args] def
         [types args] (split-type+args type+args)]
-    (with-open [out (io/writer "/tmp/ex.clj" :append true)]
-      (pp/cl-format out "(defn ~{~A~} ~A [~{~A~^ ~}]~%~2T(. ~{~A~^ ~}))~2&"
+    (with-out-str
+      (pp/cl-format true "(defn ~{~A~} ~A [~{~A~^ ~}]~%~2T(. ~{~A~^ ~}))~2&"
                     (when-let [result (canonical-type return-type)]
                       result)
                     fn-name
