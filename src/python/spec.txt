@@ -1,0 +1,28 @@
+Update the code.
+1. Use special keywords for arrays.
+   byte[] => (:array-of byte), ChangeHash[] => (:array-of ChangeHash)
+2. For constructors, add class prefix. For example, Document constructor -> make-document.
+   public Document(byte[] actorId) { ...  => (make-document [[(:array-of byte) actor-id]])
+3. Add class prefix to the name for public methods: load => document-load
+4. Change Pascal case name to kebab case name.
+   Examples:
+        Constructor case: Document => make-document
+        PUblic method case: getActorId => document-get-actor-id (with rule #3)
+
+4. The output format of a Java function definition is:
+   (<name> <return-type> (<arg-def> <arg-def> ...)),
+   where <arg-def> is [[<type-def> <arg-name>]]
+   Examples:
+        Constructor case: Document() => (make-document Document [])
+                          Document(DocPointer pointer) => (make-document Document [[DocPointer pointer]])
+        Public method case:     public byte[] getActorId() => (document-get-actor-id [:array-of byte] ())
+                public static Document load(byte[] bytes) { => (document-load Document ([[:array-of byte] bytes]))
+        public synchronized void applyEncodedChanges(byte[] changes, PatchLog patchLog) { =>
+        (document-apply-encoded-changes nil ([[:array-of byte] changes] [PatchLog patc-log]))
+        // note: void -> nil
+5. In the output file, add the original Java name. Each line is one defintion. Examples:
+   Document => (make-document Document [])
+   Document => (make-document Document [[DocPointer pointer]])
+   getActorId => (document-get-actor-id [:array-of byte] ())
+   load => (document-load Document ([[:array-of byte] bytes]))
+   applyEncodedChanges => (document-apply-encoded-changes nil ([[:array-of byte] changes] [PatchLog patc-log]))
