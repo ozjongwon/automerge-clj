@@ -98,29 +98,19 @@
   (group-by #(count (nth % 2)) methods))
 
 (defn- type-check-expr [arg-num type-spec]
-  (cond (symbol? type-spec)
-        `(~'instance? ~(symbol type-spec) ~(symbol (str "arg" arg-num)))
+  (let [arg (symbol (str "arg" arg-num))]
+    (cond (symbol? type-spec)
+          (cond (= type-spec 'int) `(~'integer? ~arg)
+                :else
+                `(~'instance? ~(symbol type-spec) ~arg))
 
-        (and (vector? type-spec) (= :array-of (first type-spec)))
-        `(~'array-instance? ~(second type-spec) ~(symbol (str "arg" arg-num)))
+          (and (vector? type-spec) (= :array-of (first type-spec)))
+          (let [type (second type-spec)]
+            (cond (= type 'byte) `(bytes? ~arg)
+                  :else
+                  `(~'array-instance? ~(second type-spec) ~arg)))
 
-        :else (throw (ex-info "Uknown typespec" {:type-spec type-spec}))))
-
-#_
-(defn- make-cond-clause [java-fn obj method]
-  (let [method-name (first method)
-        return-type (second method)
-        args (nth method 2)
-        conditions (map-indexed
-                    (fn [idx [type _]]
-                      (type-check-expr (inc idx) type))
-                    args)
-        arg-names (map-indexed
-                   (fn [idx [type name]]
-                     [type (symbol (str "arg" (inc idx)))])
-                   args)]
-    `[(~'and ~@conditions)
-      (. ~obj ~java-fn ~@(mapcat (fn [[type arg]] [(str type) arg]) arg-names))]))
+          :else (throw (ex-info "Uknown type-spec" {:type-spec type-spec})))))
 
 (defn- make-cond-clause [java-fn obj method]
   (let [method-name (first method)
