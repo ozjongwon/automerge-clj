@@ -106,7 +106,7 @@
 
           (and (vector? type-spec) (= :array-of (first type-spec)))
           (let [type (second type-spec)]
-            (cond (= type 'byte) `(bytes? ~arg)
+            (cond (= type 'byte) `(~'bytes? ~arg)
                   :else
                   `(~'array-instance? ~(second type-spec) ~arg)))
 
@@ -129,7 +129,7 @@
         `[~@(if (> (count conditions) 1)
               `((~'and ~@conditions))
               conditions)
-          (. ~obj ~java-fn ~@(mapcat (fn [[type arg]] [(str type) arg]) arg-names))]))))
+          (. ~obj ~java-fn ~@(mapcat (fn [[type arg]] [(canonical-type type) arg]) arg-names))]))))
 
 (defn- make-arity-method [java-fn java-class methods arity]
   (let [arg-symbols (map #(symbol (str "arg" (inc %))) (range arity))
@@ -139,10 +139,10 @@
       ~(if (zero? arity)
          cond-clauses
          `(~'cond ~@cond-clauses
-           :else (throw (ex-info "Type error"
-                                 ~(zipmap (map #(keyword (str "arg" (inc %)))
-                                               (range arity))
-                                          arg-symbols))))))))
+           :else (throw (~'ex-info "Type error"
+                         ~(zipmap (map #(keyword (str "arg" (inc %)))
+                                       (range arity))
+                                  arg-symbols))))))))
 
 (defn- generate-complex-multiple-arity-functions [java-fn java-class defs]
   (let [method-name (ffirst defs)
@@ -216,7 +216,7 @@
                (and (instance? ObjectId arg1) (instance? int arg2) (array-instance? ChangeHash arg3))
                (get "ObjectId" arg1 "int" arg2 [:array-of ChangeHash] arg3)
 
-               :else (throw (ex-info "Type error" {:arg1 obj :a rg2 key})))))
+               :else (throw (ex-info "Type error" {:arg1 obj :arg2 key})))))
 
   (defn group-by-arity [methods]
     "Group methods by number of arguments"
@@ -251,10 +251,10 @@
           cond-clauses (mapcat make-cond-clause methods)]
       `([~@arg-symbols]
         (~'cond ~@cond-clauses
-         :else (throw (ex-info "Type error"
-                               ~(zipmap (map #(symbol (str "arg" (inc %)))
-                                             (range arity))
-                                        arg-symbols)))))))
+         :else (throw (~'ex-info "Type error"
+                       ~(zipmap (map #(symbol (str "arg" (inc %)))
+                                     (range arity))
+                                arg-symbols)))))))
 
   (defn transform-methods [methods]
     (let [method-name (ffirst methods)
