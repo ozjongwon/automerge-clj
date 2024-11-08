@@ -84,6 +84,8 @@ def format_clojure_list(class_info: Tuple[str, List]) -> str:
     lines.append(";; Auto-generated method definitions")
     lines.append(f";; From {class_name}.java\n")
 
+    lines.append(f"\n:class-name => {class_name}\n")
+
     for method in methods:
         if method[0] == 'constructor':
             # Format constructor
@@ -109,8 +111,8 @@ def process_java_file(java_filename: str) -> None:
     """
     Process a Java file and create corresponding Clojure output file.
     """
-    base_name = os.path.splitext(os.path.basename(java_filename))[0].lower()
-    output_filename = f"{base_name}.clj"
+    base_name = os.path.splitext(os.path.basename(java_filename))[0]
+    output_filename = f"/tmp/{base_name}.clj"
 
     class_info = parse_java_file(java_filename)
     if not class_info:
