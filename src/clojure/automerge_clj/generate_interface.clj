@@ -9,19 +9,6 @@
             PatchLog SyncState Transaction Cursor]
            [java.util Optional List HashMap]))
 
-(defn array-instance? [c o]
-  (and (-> o class .isArray)
-       (= (-> o class .getComponentType)
-          c)))
-
-;; Usage example:
-(comment
-  (let [arr (make-array ChangeHash 5)]
-    (array-instance? ChangeHash arr))  ; => true
-
-  (array-instance? ChangeHash [1 2 3]) ; => false
-  )
-
 (defn init-lib []
   (Document.) ;; Native lib init happens
   ObjectId/ROOT ;; Access lazy field
@@ -146,7 +133,7 @@
                                                                                    arg-symbols)))))
 
 (defn- generate-complex-multiple-arity-functions [java-fn java-class defs]
-  (assert  (apply = (map second defs)) "Return type must be same")
+  (assert  (apply = (map second defs)) (str "Return type must be same" java-fn defs))
   (let [[fn-name return-type type+args] (first defs)
         grouped (group-by-arity defs)
         arity-methods (map (fn [[arity methods]]
@@ -190,21 +177,56 @@
                           (recur k (update result k conj exp) class-name)))))]
       (map #(generate-functions class-name %) def-map))))
 
-(defn java->clojure-interface-file [java-file]
-  (sh/sh "bash" "-c" (str "cd src/python && source python-env/bin/activate && python3 parse-java.py " java-file))
-  ;;source python-env/bin/activate 
-  (let [[name _] (-> (str/split java-file #"\/")
-                     last
-                     (str/split #"\."))
-        jv-clj-name (str name ".clj")
-        clj-name (str (csk/->snake_case name) ".clj")]
-    (with-open [out (io/writer (str "src/clojure/automerge_clj/" clj-name))]
-      (binding [*out* out]
+(defn- interface-header [classes-to-import]
+  (println ";;;\n;;; Generated file, do not edit\n;;;\n")
+  (pp/cl-format true "(ns clojure.automerge-clj.automerge-interface
+        (:import [java.util Optional List HashMap]
+                 [org.automerge ~{~A~^ ~}]))~2&~A~2&"
+                classes-to-import
+                "(defn- array-instance? [c o]
+               (and (-> o class .isArray)
+                    (= (-> o class .getComponentType)
+                       c)))"))
+
+(defn java->clojure-interface-file [java-files clj-file]
+  (let [file (io/file clj-file)]
+    (when (.exists file)
+      (io/delete-file file)))
+  (with-open [out (io/writer clj-file :append true)]
+    (binding [*out* out]
+      (interface-header (map (fn [f]
+                               (-> (str/split f #"\/")
+                                   last
+                                   (str/split #"\.")
+                                   first))
+                             java-files))
+      (doseq [java-file java-files
+              :let [[name _] (-> (str/split java-file #"\/")
+                                 last
+                                 (str/split #"\."))
+                    jv-clj-name (str name ".clj")]]
+        (sh/sh "bash" "-c" (str "cd src/python && source python-env/bin/activate && python3 parse-java.py " java-file))
+        (pp/cl-format true "~&;;; Class ~A~2&" name)
         (doseq [l (generate-clojre-interface (str "/tmp/" jv-clj-name))]
           (println l))))))
+
 (comment
-  (java->clojure-interface-file "~/Work/automerge-java/lib/src/main/java/org/automerge/Document.java")
-  (java->clojure-interface-file "~/Work/automerge-java/lib/src/main/java/org/automerge/ObjectId.java")
-  (java->clojure-interface-file "~/Work/automerge-java/lib/src/main/java/org/automerge/ChangeHash.java")
-  (java->clojure-interface-file "~/Work/automerge-java/lib/src/main/java/org/automerge/PatchLog.java")
+  (defn array-instance? [c o]
+    (and (-> o class .isArray)
+         (= (-> o class .getComponentType)
+            c)))
+
+  (let [arr (make-array ChangeHash 5)]
+    (array-instance? ChangeHash arr))
+
+  (java->clojure-interface-file ["~/Work/automerge-java/lib/src/main/java/org/automerge/Document.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/Transaction.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/ObjectId.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/ChangeHash.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/PatchLog.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/Cursor.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/SyncState.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/PatchLog.java"
+                                 ]
+                                "src/clojure/automerge_clj/automerge_interface.clj")
   )

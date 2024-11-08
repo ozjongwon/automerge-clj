@@ -30,7 +30,8 @@ def format_type(java_type) -> str:
 
 def parse_java_file(java_filename: str) -> Optional[Tuple[str, List[Tuple[str, str, List[Tuple[str, str]]]]]]:
     """
-    Parse Java source file and extract class name and method information.
+    Parse Java source file and extract type name and method information.
+    Handles both classes and interfaces.
     """
     try:
         with open(java_filename, 'r', encoding='utf-8') as file:
@@ -38,24 +39,25 @@ def parse_java_file(java_filename: str) -> Optional[Tuple[str, List[Tuple[str, s
 
         tree = javalang.parse.parse(java_source)
         methods = []
-        class_name = None
+        type_name = None
 
-        # Walk through all class declarations
-        for _, class_decl in tree.filter(javalang.tree.ClassDeclaration):
-            class_name = class_decl.name
+        # Handle both ClassDeclaration and InterfaceDeclaration
+        for path, node in tree.filter(javalang.tree.TypeDeclaration):
+            type_name = node.name
 
-            # Process constructors
-            for constructor in class_decl.constructors:
-                if 'public' in constructor.modifiers:
-                    params = []
-                    for param in constructor.parameters:
-                        param_type = format_type(param.type)
-                        param_name = pascal_to_kebab(param.name)
-                        params.append((param_type, param_name))
-                    methods.append(('constructor', class_name, params))
+            # Process constructors only if it's a class
+            if isinstance(node, javalang.tree.ClassDeclaration):
+                for constructor in node.constructors:
+                    if 'public' in constructor.modifiers:
+                        params = []
+                        for param in constructor.parameters:
+                            param_type = format_type(param.type)
+                            param_name = pascal_to_kebab(param.name)
+                            params.append((param_type, param_name))
+                        methods.append(('constructor', type_name, params))
 
-            # Process regular methods
-            for method in class_decl.methods:
+            # Process methods for both classes and interfaces
+            for method in node.methods:
                 if 'public' in method.modifiers:
                     method_name = method.name
                     return_type = 'nil' if method.return_type is None else format_type(method.return_type)
@@ -68,39 +70,39 @@ def parse_java_file(java_filename: str) -> Optional[Tuple[str, List[Tuple[str, s
 
                     methods.append(('method', method_name, params, return_type))
 
-        return (class_name, methods)
+        return (type_name, methods)
 
     except Exception as e:
         print(f"Error processing file: {e}")
         return None
 
-def format_clojure_list(class_info: Tuple[str, List]) -> str:
+def format_clojure_list(type_info: Tuple[str, List]) -> str:
     """
     Format the parsed method information into Clojure-style lists.
     """
-    class_name, methods = class_info
+    type_name, methods = type_info
     lines = []
 
     lines.append(";; Auto-generated method definitions")
-    lines.append(f";; From {class_name}.java\n")
+    lines.append(f";; From {type_name}.java\n")
 
-    lines.append(f"\n(:class-name {class_name})\n")
+    lines.append(f"\n(:class-name {type_name})\n")
 
     for method in methods:
         if method[0] == 'constructor':
             # Format constructor
             _, _, params = method
             param_str = ' '.join(f"[{param_type} {param_name}]" for param_type, param_name in params)
-            constructor_name = f"make-{pascal_to_kebab(class_name)}"
+            constructor_name = f"make-{pascal_to_kebab(type_name)}"
 
             # Add the original name and formatted definition
-            lines.append(f"{class_name} => ({constructor_name} {class_name} ({param_str}))")
+            lines.append(f"{type_name} => ({constructor_name} {type_name} ({param_str}))")
 
         else:
             # Format regular method
             _, original_name, params, return_type = method
             param_str = ' '.join(f"[{param_type} {param_name}]" for param_type, param_name in params)
-            formatted_name = f"{pascal_to_kebab(class_name)}-{pascal_to_kebab(original_name)}"
+            formatted_name = f"{pascal_to_kebab(type_name)}-{pascal_to_kebab(original_name)}"
 
             # Add the original name and formatted definition
             lines.append(f"{original_name} => ({formatted_name} {return_type} ({param_str}))")
@@ -114,13 +116,13 @@ def process_java_file(java_filename: str) -> None:
     base_name = os.path.splitext(os.path.basename(java_filename))[0]
     output_filename = f"/tmp/{base_name}.clj"
 
-    class_info = parse_java_file(java_filename)
-    if not class_info:
+    type_info = parse_java_file(java_filename)
+    if not type_info:
         print("No methods were extracted.")
         return
 
     try:
-        clojure_content = format_clojure_list(class_info)
+        clojure_content = format_clojure_list(type_info)
         with open(output_filename, 'w', encoding='utf-8') as file:
             file.write(clojure_content)
         print(f"Successfully created {output_filename}")
