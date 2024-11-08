@@ -74,9 +74,9 @@
 ;;   Optional
 ;;   ([SyncState sync-state]))
 (defn- generate-simple-multiple-arity-functions [java-fn java-class defs]
-  (assert (and (apply = (map second defs))) "Return values must be same")
+  (assert (apply = (map second defs)) "Return type must be same")
   (let [[fn-name return-type type+args] (first defs)]
-    (pp/cl-format nil "(defn ~{~A~} ~A~&~{~A~^~%~})"
+    (pp/cl-format nil "(defn ~{~A~} ~A~%~{~A~^~%~})"
                   (when-let [result (canonical-type return-type)]
                     result)
                   fn-name
@@ -131,6 +131,7 @@
               conditions)
           (. ~obj ~java-fn ~@(mapcat (fn [[type arg]] [(canonical-type type) arg]) arg-names))]))))
 
+#_
 (defn- make-arity-method [java-fn java-class methods arity]
   (let [arg-symbols (map #(symbol (str "arg" (inc %))) (range arity))
         [main-obj-type main-obj] (make-main-instance-arg java-class)
@@ -144,14 +145,30 @@
                                        (range arity))
                                   arg-symbols))))))))
 
+(defn- make-arity-method [java-fn java-class methods arity]
+  (let [arg-symbols (map #(symbol (str "arg" (inc %))) (range arity))
+        [main-obj-type main-obj] (make-main-instance-arg java-class)
+        cond-clauses (mapcat #(make-cond-clause java-fn main-obj %) methods)]
+    (if (zero? arity)
+      (pp/cl-format nil "[~{~A~^ ~}]~%~3T~A"
+                    `(~main-obj-type ~main-obj ~@arg-symbols) cond-clauses)
+      (pp/cl-format nil "[~{~A~^ ~}]~%~2T(cond ~{~A~^~%~8T~}~%~8T:else (throw (ex-info \"Type error\" ~S)))~%"
+                    `(~main-obj-type ~main-obj ~@arg-symbols) cond-clauses (zipmap (map #(keyword (str "arg" (inc %)))
+                                                                                        (range arity))
+                                                                                   arg-symbols)))))
+
 (defn- generate-complex-multiple-arity-functions [java-fn java-class defs]
-  (let [method-name (ffirst defs)
+  (assert  (apply = (map second defs)) "Return type must be same")
+  (let [[fn-name return-type type+args] (first defs)
         grouped (group-by-arity defs)
         arity-methods (map (fn [[arity methods]]
                              (make-arity-method java-fn java-class methods arity))
                            grouped)]
-    `(~'defn ~method-name
-      ~@arity-methods)))
+    (pp/cl-format nil "(defn ~{~A~} ~A~%~{~2T(~A)~^~%~})"
+                  (when-let [result (canonical-type return-type)]
+                    result)
+                  fn-name
+                  arity-methods)))
 
 (defn- generate-multy-arity-functions [java-fn java-class defs]
   (if (simple-case? defs)
