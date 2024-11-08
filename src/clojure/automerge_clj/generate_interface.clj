@@ -2,8 +2,10 @@
   (:require
    [clojure.java.io :as io]
    [clojure.pprint :as pp]
-   [clojure.string :as str])
-  (:import [org.automerge AutomergeSys Document ObjectId ChangeHash ObjectType
+   [clojure.string :as str]
+   [clojure.java.shell :as sh]
+   [camel-snake-kebab.core :as csk])
+  (:import [org.automerge Document ObjectId ChangeHash ObjectType
             PatchLog SyncState Transaction Cursor]
            [java.util Optional List HashMap]))
 
@@ -189,88 +191,33 @@
                           (recur k (update result k conj exp) class-var)))))))]
       (map #(generate-functions class-var %) def-map))))
 
-
-
+(defn java->clojure-interface-file [java-file]
+  (sh/sh "bash" "-c" (str "cd src/python && source python-env/bin/activate && python3 parse-java.py " java-file))
+  ;;source python-env/bin/activate 
+  (let [[name _] (-> (str/split java-file #"\/")
+                     last
+                     (str/split #"\."))
+        jv-clj-name (str name ".clj")
+        clj-name (str (csk/->snake_case name) ".clj")]
+    (with-open [out (io/writer (str "src/clojure/automerge_clj/" clj-name))]
+      (binding [*out* out]
+        (doseq [l (generate-clojre-interface (str "/tmp/" jv-clj-name))]
+          (println l))))))
 (comment
+  (java->clojure-interface-file "~/Work/automerge-java/lib/src/main/java/org/automerge/Document.java")
+  (java->clojure-interface-file "~/Work/automerge-java/lib/src/main/java/org/automerge/ObjectId.java")
+  (java->clojure-interface-file "~/Work/automerge-java/lib/src/main/java/org/automerge/ChangeHash.java")
+  (java->clojure-interface-file "~/Work/automerge-java/lib/src/main/java/org/automerge/PatchLog.java")
+  ;; python3 parse-java.py ~/Work/automerge-java/lib/src/main/java/org/automerge/Document.java
+  ;; python3 parse-java.py ~/Work/automerge-java/lib/src/main/java/org/automerge/ObjectId.java
+  ;; python3 parse-java.py ~/Work/automerge-java/lib/src/main/java/org/automerge/ChangeHash.java 
+  ;; python3 parse-java.py ~/Work/automerge-java/lib/src/main/java/org/automerge/PatchLog.java 
+  (generate-clojre-interface "src/python/document.clj")
+  (generate-clojre-interface "src/python/objectid.clj")
+  (generate-clojre-interface "src/python/patchlog.clj")
+  (generate-clojre-interface "src/python/changehash.clj")
   (with-open [out (io/writer "/tmp/ex.clj")]
     (binding [*out* out]
       (doseq [l *1]
         (println l))))
-
-  (def def-list [(document-get Optional ([ObjectId obj] [String key]))
-                 (document-get Optional ([ObjectId obj] [int key]))
-                 (document-get Optional ([ObjectId obj] [String key] [[:array-of ChangeHash] heads]))
-                 (document-get Optional ([ObjectId obj] [int idx] [[:array-of ChangeHash] heads]))
-                 ])
-
-  (spec document-get
-        ([arg1 arg2]
-         (cond (and (instance? Arg1ectId arg1) (instance? String arg2))
-               (get "Arg1ectId" arg1 "String" arg2)
-
-               (and (instance? Arg1ectId arg1) (instance? int  arg2))
-               (get "Arg1ectId" arg1 "int" arg2)
-
-               :else (throw (ex-info "Type error" {:arg1 arg1 :arg2 arg2}))))
-        ([arg1 arg2 arg3]
-         (cond (and (instance? ObjectId arg1) (instance? String arg2) (array-instance? ChangeHash arg3))
-               (get "ObjectId" arg1 "String" arg2 [:array-of ChangeHash] arg3)
-
-               (and (instance? ObjectId arg1) (instance? int arg2) (array-instance? ChangeHash arg3))
-               (get "ObjectId" arg1 "int" arg2 [:array-of ChangeHash] arg3)
-
-               :else (throw (ex-info "Type error" {:arg1 obj :arg2 key})))))
-
-  (defn group-by-arity [methods]
-    "Group methods by number of arguments"
-    (group-by #(count (nth % 2)) methods))
-
-  (defn type-check-expr [arg-num type-name]
-    (cond
-      (= type-name '[:array-of ChangeHash])
-      `(~'array-instance? ChangeHash ~(symbol (str "arg" arg-num)))
-
-      :else
-      `(~'instance? ~(symbol type-name) ~(symbol (str "arg" arg-num)))))
-
-  (defn make-cond-clause [method]
-    (let [method-name (first method)
-          return-type (second method)
-          args (nth method 2)
-          conditions (map-indexed
-                      (fn [idx [type _]]
-                        (type-check-expr (inc idx) type))
-                      args)
-          arg-names (map-indexed
-                     (fn [idx [type name]]
-                       [type (symbol (str "arg" (inc idx)))])
-                     args)]
-      `(~'and ~@conditions)
-      `[(~'and ~@conditions)
-        (~'get ~@(mapcat (fn [[type arg]] [(str type) arg]) arg-names))]))
-
-  (defn make-arity-method [methods arity]
-    (let [arg-symbols (map #(symbol (str "arg" (inc %))) (range arity))
-          cond-clauses (mapcat make-cond-clause methods)]
-      `([~@arg-symbols]
-        (~'cond ~@cond-clauses
-         :else (throw (~'ex-info "Type error"
-                       ~(zipmap (map #(symbol (str "arg" (inc %)))
-                                     (range arity))
-                                arg-symbols)))))))
-
-  (defn transform-methods [methods]
-    (let [method-name (ffirst methods)
-          grouped (group-by-arity methods)
-          arity-methods (map (fn [[arity methods]]
-                               (make-arity-method methods arity))
-                             grouped)]
-      `(~'spec ~method-name
-        ~@arity-methods)))
-
-  ;; Example usage:
-  (def input
-    '[(document-get Optional ([ObjectId obj] [String key]))
-      (document-get Optional ([ObjectId obj] [int key]))
-      (document-get Optional ([ObjectId obj] [String key] [[:array-of ChangeHash] heads]))
-      (document-get Optional ([ObjectId obj] [int idx] [[:array-of ChangeHash] heads]))]))
+  )
