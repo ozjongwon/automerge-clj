@@ -57,7 +57,7 @@
 (defn- generate-a-function [java-fn java-class def]
   (let [[fn-name return-type type+args] def
         [types args] (split-type+args type+args)]
-    (pp/cl-format nil "(defn ~{~A~} ~A [~{~A~^ ~}]~%~2T(. ~{~A~^ ~}))~2&"
+    (pp/cl-format nil "(defn ~{~A~} ~A [~{~A~^ ~}]~%~2T(. ~{~A~^ ~}))~&"
                   (when-let [result (canonical-type return-type)]
                     result)
                   fn-name
@@ -76,13 +76,13 @@
 (defn- generate-simple-multiple-arity-functions [java-fn java-class defs]
   (assert (apply = (map second defs)) "Return type must be same")
   (let [[fn-name return-type type+args] (first defs)]
-    (pp/cl-format nil "(defn ~{~A~} ~A~%~{~A~^~%~})"
+    (pp/cl-format nil "(defn ~{~A~} ~A~%~{~A~^~%~})~&"
                   (when-let [result (canonical-type return-type)]
                     result)
                   fn-name
                   (for [[_ _ type+args] defs
                         :let [[types args] (split-type+args type+args)]]
-                    (pp/cl-format nil "~2T([~{~A~^ ~}]~%~2T (. ~{~A~^ ~}))~%"
+                    (pp/cl-format nil "~2T([~{~A~^ ~}]~%~2T (. ~{~A~^ ~}))"
                                   `(~@(make-main-instance-arg java-class)
                                     ~@(mapcat (fn [type arg]
                                                 (list (canonical-type type) arg))
@@ -131,20 +131,6 @@
               conditions)
           (. ~obj ~java-fn ~@(mapcat (fn [[type arg]] [(canonical-type type) arg]) arg-names))]))))
 
-#_
-(defn- make-arity-method [java-fn java-class methods arity]
-  (let [arg-symbols (map #(symbol (str "arg" (inc %))) (range arity))
-        [main-obj-type main-obj] (make-main-instance-arg java-class)
-        cond-clauses (mapcat #(make-cond-clause java-fn main-obj %) methods)]
-    `([~main-obj-type ~main-obj ~@arg-symbols]
-      ~(if (zero? arity)
-         cond-clauses
-         `(~'cond ~@cond-clauses
-           :else (throw (~'ex-info "Type error"
-                         ~(zipmap (map #(keyword (str "arg" (inc %)))
-                                       (range arity))
-                                  arg-symbols))))))))
-
 (defn- make-arity-method [java-fn java-class methods arity]
   (let [arg-symbols (map #(symbol (str "arg" (inc %))) (range arity))
         [main-obj-type main-obj] (make-main-instance-arg java-class)
@@ -152,7 +138,7 @@
     (if (zero? arity)
       (pp/cl-format nil "[~{~A~^ ~}]~%~3T~A"
                     `(~main-obj-type ~main-obj ~@arg-symbols) cond-clauses)
-      (pp/cl-format nil "[~{~A~^ ~}]~%~2T(cond ~{~A~^~%~8T~}~%~8T:else (throw (ex-info \"Type error\" ~S)))~%"
+      (pp/cl-format nil "[~{~A~^ ~}]~%~2T(cond ~{~A~^~%~8T~}~%~8T:else (throw (ex-info \"Type error\" ~S)))"
                     `(~main-obj-type ~main-obj ~@arg-symbols) cond-clauses (zipmap (map #(keyword (str "arg" (inc %)))
                                                                                         (range arity))
                                                                                    arg-symbols)))))
@@ -164,7 +150,7 @@
         arity-methods (map (fn [[arity methods]]
                              (make-arity-method java-fn java-class methods arity))
                            grouped)]
-    (pp/cl-format nil "(defn ~{~A~} ~A~%~{~2T(~A)~^~%~})"
+    (pp/cl-format nil "(defn ~{~A~} ~A~%~{~2T(~A)~^~%~})~&"
                   (when-let [result (canonical-type return-type)]
                     result)
                   fn-name
