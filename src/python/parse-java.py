@@ -43,7 +43,8 @@ def parse_java_file(java_filename: str) -> Optional[Tuple[str, List[Tuple[str, s
 
         # Handle both ClassDeclaration and InterfaceDeclaration
         for path, node in tree.filter(javalang.tree.TypeDeclaration):
-            type_name = node.name
+            if type_name is None:
+                type_name = node.name
 
             # Process constructors only if it's a class
             if isinstance(node, javalang.tree.ClassDeclaration):
@@ -68,8 +69,8 @@ def parse_java_file(java_filename: str) -> Optional[Tuple[str, List[Tuple[str, s
                         param_name = pascal_to_kebab(param.name)
                         params.append((param_type, param_name))
 
-                    methods.append(('method', method_name, params, return_type))
-
+                    methods.append(('method', method_name, params, return_type,
+                                    'true' if 'static' in method.modifiers else 'false'))
         return (type_name, methods)
 
     except Exception as e:
@@ -96,16 +97,16 @@ def format_clojure_list(type_info: Tuple[str, List]) -> str:
             constructor_name = f"make-{pascal_to_kebab(type_name)}"
 
             # Add the original name and formatted definition
-            lines.append(f"{type_name} => ({constructor_name} {type_name} ({param_str}))")
+            lines.append(f"{type_name} => ({constructor_name} {type_name} ({param_str}) :constructor? true)")
 
         else:
             # Format regular method
-            _, original_name, params, return_type = method
+            _, original_name, params, return_type, static_p = method
             param_str = ' '.join(f"[{param_type} {param_name}]" for param_type, param_name in params)
             formatted_name = f"{pascal_to_kebab(type_name)}-{pascal_to_kebab(original_name)}"
 
             # Add the original name and formatted definition
-            lines.append(f"{original_name} => ({formatted_name} {return_type} ({param_str}))")
+            lines.append(f"{original_name} => ({formatted_name} {return_type} ({param_str}) :static? {static_p})")
 
     return '\n'.join(lines)
 
@@ -117,6 +118,7 @@ def process_java_file(java_filename: str) -> None:
     output_filename = f"/tmp/{base_name}.clj"
 
     type_info = parse_java_file(java_filename)
+
     if not type_info:
         print("No methods were extracted.")
         return

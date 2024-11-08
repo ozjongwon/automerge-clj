@@ -1,16 +1,11 @@
 (ns clojure.automerge-clj.generate-interface
   (:require
    [clojure.java.io :as io]
-   [clojure.pprint :as pp]
-   [clojure.string :as str]
    [clojure.java.shell :as sh]
-   [camel-snake-kebab.core :as csk])
-  (:import [org.automerge Document ObjectId ChangeHash ObjectType
-            PatchLog SyncState Transaction Cursor
-            NewValue
-            NewValue$UInt NewValue$Int NewValue$F64 NewValue$Str NewValue$Bool
-            NewValue$Null NewValue$Bytes NewValue$Counter NewValue$Timestamp]
-           [java.util Optional List HashMap Date]))
+   [clojure.pprint :as pp]
+   [clojure.string :as str])
+  (:import
+   (org.automerge ChangeHash Document ObjectId)))
 
 (defn init-lib []
   (Document.) ;; Native lib init happens
@@ -47,23 +42,27 @@
 
         :else (throw (ex-info "Unknown type" {:type type}))))
 
-(defn- make-main-instance-arg [java-class]
-  [(canonical-type java-class) (symbol (str/lower-case java-class))])
+(defn- make-main-instance-arg [java-class & {:keys [static? constructor?]}]
+  (when-not (or static? constructor?)
+    [(canonical-type java-class) (symbol (str/lower-case java-class))]))
+
+(defn- make-java-call-signature [java-class java-fn args & {:keys [static? constructor?]}]
+  (cond constructor? `(~(str java-class \.) ~@args)
+        static? `(~(str java-class "/" java-fn) ~@args)
+        :else `(~(str \. java-fn) ~(str/lower-case java-class) ~@args)))
 
 (defn- generate-a-function [java-fn java-class def]
-  (let [[fn-name return-type type+args] def
+  (let [[fn-name return-type type+args & {:keys [static? constructor?] :as opts}] def
         [types args] (split-type+args type+args)]
-    (pp/cl-format nil "(defn ~{~A~} ~A [~{~A~^ ~}]~%~2T(. ~{~A~^ ~}))~&"
+    (pp/cl-format nil "(defn ~{~A~} ~A [~{~A~^ ~}]~%~2T(~{~A~^ ~}))~&"
                   (when-let [result (canonical-type return-type)]
                     result)
                   fn-name
-                  `(~@(make-main-instance-arg java-class)
+                  `(~@(make-main-instance-arg java-class opts)
                     ~@(mapcat (fn [type arg]
                                 (list (canonical-type type) arg))
                               types args))
-                  `(~(str/lower-case java-class)
-                    ~java-fn
-                    ~@args))))
+                  (make-java-call-signature java-class java-fn args opts))))
 
 ;; (clojure.core/defn
 ;;   document-generate-sync-message
@@ -71,21 +70,19 @@
 ;;   ([SyncState sync-state]))
 (defn- generate-simple-multiple-arity-functions [java-fn java-class defs]
   (assert (apply = (map second defs)) "Return type must be same")
-  (let [[fn-name return-type type+args] (first defs)]
+  (let [[fn-name return-type type+args & {:keys [static? constructor?] :as opts}] (first defs)]
     (pp/cl-format nil "(defn ~{~A~} ~A~%~{~A~^~%~})~&"
                   (when-let [result (canonical-type return-type)]
                     result)
                   fn-name
                   (for [[_ _ type+args] defs
                         :let [[types args] (split-type+args type+args)]]
-                    (pp/cl-format nil "~2T([~{~A~^ ~}]~%~2T (. ~{~A~^ ~}))"
-                                  `(~@(make-main-instance-arg java-class)
+                    (pp/cl-format nil "~2T([~{~A~^ ~}]~%~2T (~{~A~^ ~}))"
+                                  `(~@(make-main-instance-arg java-class opts)
                                     ~@(mapcat (fn [type arg]
                                                 (list (canonical-type type) arg))
                                               types args))
-                                  `(~(str/lower-case java-class)
-                                    ~java-fn
-                                    ~@args))))))
+                                  (make-java-call-signature java-class java-fn args opts))))))
 ;;;
 ;;; Multiple arity case
 ;;;
@@ -108,10 +105,24 @@
 
           :else (throw (ex-info "Uknown type-spec" {:type-spec type-spec})))))
 
-(defn- make-cond-clause [java-fn obj method]
-  (let [method-name (first method)
-        return-type (second method)
-        args (nth method 2)]
+(defn- make-cond-clause [java-class java-fn obj [mname mreturn-type args opts]]
+  (let [conditions (map-indexed
+                    (fn [idx [type _]]
+                      (type-check-expr (inc idx) type))
+                    args)
+        arg-names (map-indexed
+                   (fn [idx [type name]]
+                     [type (symbol (str "arg" (inc idx)))])
+                   args)]
+    `(~@(if (> (count conditions) 1)
+          `((~'and ~@conditions))
+          conditions)
+      ~(make-java-call-signature java-class
+                                 java-fn
+                                 `(~@(mapcat (fn [[type arg]] [(canonical-type type) arg]) arg-names))
+                                 opts)))
+  #_
+  (let [call-sign (make-java-call-signature java-class java-fn args)]
     (if (empty? args)
       `(.~obj ~java-fn)
       (let [conditions (map-indexed
@@ -127,10 +138,10 @@
               conditions)
           (. ~obj ~java-fn ~@(mapcat (fn [[type arg]] [(canonical-type type) arg]) arg-names))]))))
 
-(defn- make-arity-method [java-fn java-class methods arity]
+(defn- make-arity-method [java-fn java-class methods arity opts]
   (let [arg-symbols (map #(symbol (str "arg" (inc %))) (range arity))
-        [main-obj-type main-obj] (make-main-instance-arg java-class)
-        cond-clauses (mapcat #(make-cond-clause java-fn main-obj %) methods)]
+        [main-obj-type main-obj] (make-main-instance-arg java-class opts)
+        cond-clauses (mapcat #(make-cond-clause java-class java-fn main-obj %) methods)]
     (if (zero? arity)
       (pp/cl-format nil "[~{~A~^ ~}]~%~3T~A"
                     `(~main-obj-type ~main-obj ~@arg-symbols) cond-clauses)
@@ -141,10 +152,10 @@
 
 (defn- generate-complex-multiple-arity-functions [java-fn java-class defs]
   (assert  (apply = (map second defs)) (str "Return type must be same" java-fn defs))
-  (let [[fn-name return-type type+args] (first defs)
+  (let [[fn-name return-type type+args & opts] (first defs)
         grouped (group-by-arity defs)
         arity-methods (map (fn [[arity methods]]
-                             (make-arity-method java-fn java-class methods arity))
+                             (make-arity-method java-fn java-class methods arity opts))
                            grouped)]
     (pp/cl-format nil "(defn ~{~A~} ~A~%~{~2T(~A)~^~%~})~&"
                   (when-let [result (canonical-type return-type)]
@@ -187,41 +198,28 @@
                   (generate-functions java-name [jfn exp])))))))
 
 (defonce special-case-functions 
-  "(defn- array-instance? [c o]
+  "(defonce +object-id-root+ ObjectId/ROOT)
+
+(defonce +object-type-map+ ObjectType/MAP)
+(defonce +object-type-list+ ObjectType/LIST)
+(defonce +object-type-text+ ObjectType/TEXT)
+
+(defonce +expand-mark-before+ ExpandMark/BEFORE)
+(defonce +expand-mark-after+ ExpandMark/AFTER)
+(defonce +expand-mark-both+ ExpandMark/BOTH)
+(defonce +expand-mark-none+ ExpandMark/NONE)
+
+
+(defn- array-instance? [c o]
   (and (-> o class .isArray)
        (= (-> o class .getComponentType)
-          c)))
-
-(defn ^NewValue new-value-uint [^Long value]
-  (NewValue/uint value))
-
-(defn ^NewValue new-value-integer [^Long value]
-  (NewValue/integer value))
-
-(defn ^NewValue new-value-f64 [^Double value]
-  (NewValue/f64 value))
-
-(defn ^NewValue new-value-bool [^Boolean value]
-  (NewValue/bool value))
-
-(defn ^NewValue new-value-str [^String value]
-  (NewValue/str value))
-
-(defn ^NewValue new-value-bytes [^bytes value]
-  (NewValue/bytes value))
-
-(defn ^NewValue new-value-counter [^Long value]
-  (NewValue/bytes value))
-
-(defn ^NewValue new-value-timestamp [^Date value]
-  (NewValue/timestamp value))
-")
+          c)))")
 
 (defn- interface-header [classes-to-import]
   (println ";;;\n;;; Generated file, do not edit\n;;;\n")
   (pp/cl-format true "(ns clojure.automerge-clj.automerge-interface
         (:import [java.util Optional List HashMap Date Iterator]
-                 [org.automerge ~{~A~^ ~} NewValue]))~2&~A~2&"
+                 [org.automerge ObjectId ObjectType ExpandMark~%~{~A~^ ~}]))~2&~A~2&"
                 classes-to-import
                 special-case-functions))
 
@@ -258,14 +256,17 @@
 
   (java->clojure-interface-file ["~/Work/automerge-java/lib/src/main/java/org/automerge/Document.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/Transaction.java"
-                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/ObjectId.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/Counter.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/ChangeHash.java"
-                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/PatchLog.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/Cursor.java"
-                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/SyncState.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/PatchLog.java"
-                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/ExpandMark.java"
-                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/ObjectType.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/SyncState.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/NewValue.java"
+                                 ;; "~/Work/automerge-java/lib/src/main/java/org/automerge/CommitResult.java"
+                                 ;; "~/Work/automerge-java/lib/src/main/java/org/automerge/ObjectId.java"
+
+                                 ;; "~/Work/automerge-java/lib/src/main/java/org/automerge/ObjectType.java"
+
                                  ]
                                 "src/clojure/automerge_clj/automerge_interface.clj")
   )
