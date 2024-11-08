@@ -172,24 +172,23 @@
   "Reads the file, processes each line, and returns a map of function names to their Clojure definitions."
   (with-open [reader (clojure.java.io/reader filename)]  ; Open the file for reading
     (let [reader (java.io.PushbackReader. reader)
-          [class-var def-map]
-          (loop [k nil result {} class-var nil]
+          [class-name def-map]
+          (loop [k nil result {} class-name nil]
             (let [exp (read reader false :eof)]
-              (cond (= :eof exp) [class-var result]
-                    (= '=> exp) (recur k result class-var)
+              (cond (= :eof exp) [class-name result]
+                    (= '=> exp) (recur k result class-name)
                     (symbol? exp) (recur exp 
                                          (update result exp (fnil identity []))
-                                         class-var)
-                    (list? exp) 
-                    (if class-var
-                      (recur k (update result k conj exp) class-var)
-                      (let [[fname return-type _] exp
-                            [make class] (str/split (name fname)  #"\-")]
-                        (if (and (= make "make")
-                                 (= class (str/lower-case return-type)))
-                          (recur k (update result k conj exp) return-type)
-                          (recur k (update result k conj exp) class-var)))))))]
-      (map #(generate-functions class-var %) def-map))))
+                                         class-name)
+                    (list? exp) ;; def
+                    (cond class-name (recur k (update result k conj exp) class-name)
+
+                          (= (first exp) :class-name)
+                          (recur k result (second exp))
+
+                          :else
+                          (recur k (update result k conj exp) class-name)))))]
+      (map #(generate-functions class-name %) def-map))))
 
 (defn java->clojure-interface-file [java-file]
   (sh/sh "bash" "-c" (str "cd src/python && source python-env/bin/activate && python3 parse-java.py " java-file))
@@ -208,16 +207,4 @@
   (java->clojure-interface-file "~/Work/automerge-java/lib/src/main/java/org/automerge/ObjectId.java")
   (java->clojure-interface-file "~/Work/automerge-java/lib/src/main/java/org/automerge/ChangeHash.java")
   (java->clojure-interface-file "~/Work/automerge-java/lib/src/main/java/org/automerge/PatchLog.java")
-  ;; python3 parse-java.py ~/Work/automerge-java/lib/src/main/java/org/automerge/Document.java
-  ;; python3 parse-java.py ~/Work/automerge-java/lib/src/main/java/org/automerge/ObjectId.java
-  ;; python3 parse-java.py ~/Work/automerge-java/lib/src/main/java/org/automerge/ChangeHash.java 
-  ;; python3 parse-java.py ~/Work/automerge-java/lib/src/main/java/org/automerge/PatchLog.java 
-  (generate-clojre-interface "src/python/document.clj")
-  (generate-clojre-interface "src/python/objectid.clj")
-  (generate-clojre-interface "src/python/patchlog.clj")
-  (generate-clojre-interface "src/python/changehash.clj")
-  (with-open [out (io/writer "/tmp/ex.clj")]
-    (binding [*out* out]
-      (doseq [l *1]
-        (println l))))
   )
