@@ -6,8 +6,11 @@
    [clojure.java.shell :as sh]
    [camel-snake-kebab.core :as csk])
   (:import [org.automerge Document ObjectId ChangeHash ObjectType
-            PatchLog SyncState Transaction Cursor]
-           [java.util Optional List HashMap]))
+            PatchLog SyncState Transaction Cursor
+            NewValue
+            NewValue$UInt NewValue$Int NewValue$F64 NewValue$Str NewValue$Bool
+            NewValue$Null NewValue$Bytes NewValue$Counter NewValue$Timestamp]
+           [java.util Optional List HashMap Date]))
 
 (defn init-lib []
   (Document.) ;; Native lib init happens
@@ -30,6 +33,10 @@
   (cond (nil? type) nil
 
         (= 'int type) "^Integer"
+
+        (= 'long type) "^Long"
+
+        (= 'boolean type) "^Boolean"
 
         (symbol? type) (str "^" type)
 
@@ -159,34 +166,64 @@
   "Reads the file, processes each line, and returns a map of function names to their Clojure definitions."
   (with-open [reader (clojure.java.io/reader filename)]  ; Open the file for reading
     (let [reader (java.io.PushbackReader. reader)
-          [class-name def-map]
-          (loop [k nil result {} class-name nil]
-            (let [exp (read reader false :eof)]
-              (cond (= :eof exp) [class-name result]
-                    (= '=> exp) (recur k result class-name)
-                    (symbol? exp) (recur exp 
-                                         (update result exp (fnil identity []))
-                                         class-name)
-                    (list? exp) ;; def
-                    (cond class-name (recur k (update result k conj exp) class-name)
+          [k arrow java-name] (list  (read reader false :eof) (read reader false :eof) (read reader false :eof))]
 
-                          (= (first exp) :class-name)
-                          (recur k result (second exp))
+      (assert (and (= :java-name k) (= '=> arrow) (symbol? java-name)) "File format must be valid")
 
-                          :else
-                          (recur k (update result k conj exp) class-name)))))]
-      (map #(generate-functions class-name %) def-map))))
+      (->> (loop [result {}]
+             (let [java-name (read reader false :eof)
+                   arrow (read reader false :eof)
+                   clj-name-return-args (read reader false :eof)]
+               (when-not (= :eof java-name)
+                 (assert (and (symbol? java-name) (= '=> arrow) (list? clj-name-return-args))
+                         "Entry format must be valid"))
+               (if (= :eof java-name)
+                 result
+                 (recur (update result
+                                [java-name (second clj-name-return-args)] ;; key
+                                (fnil conj [])
+                                clj-name-return-args)))))
+           (map (fn [[[jfn _] exp]]
+                  (generate-functions java-name [jfn exp])))))))
+
+(defonce special-case-functions 
+  "(defn- array-instance? [c o]
+  (and (-> o class .isArray)
+       (= (-> o class .getComponentType)
+          c)))
+
+(defn ^NewValue new-value-uint [^Long value]
+  (NewValue/uint value))
+
+(defn ^NewValue new-value-integer [^Long value]
+  (NewValue/integer value))
+
+(defn ^NewValue new-value-f64 [^Double value]
+  (NewValue/f64 value))
+
+(defn ^NewValue new-value-bool [^Boolean value]
+  (NewValue/bool value))
+
+(defn ^NewValue new-value-str [^String value]
+  (NewValue/str value))
+
+(defn ^NewValue new-value-bytes [^bytes value]
+  (NewValue/bytes value))
+
+(defn ^NewValue new-value-counter [^Long value]
+  (NewValue/bytes value))
+
+(defn ^NewValue new-value-timestamp [^Date value]
+  (NewValue/timestamp value))
+")
 
 (defn- interface-header [classes-to-import]
   (println ";;;\n;;; Generated file, do not edit\n;;;\n")
   (pp/cl-format true "(ns clojure.automerge-clj.automerge-interface
-        (:import [java.util Optional List HashMap]
-                 [org.automerge ~{~A~^ ~}]))~2&~A~2&"
+        (:import [java.util Optional List HashMap Date Iterator]
+                 [org.automerge ~{~A~^ ~} NewValue]))~2&~A~2&"
                 classes-to-import
-                "(defn- array-instance? [c o]
-               (and (-> o class .isArray)
-                    (= (-> o class .getComponentType)
-                       c)))"))
+                special-case-functions))
 
 (defn java->clojure-interface-file [java-files clj-file]
   (let [file (io/file clj-file)]
@@ -227,6 +264,9 @@
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/Cursor.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/SyncState.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/PatchLog.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/ExpandMark.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/ObjectType.java"
                                  ]
                                 "src/clojure/automerge_clj/automerge_interface.clj")
   )
+

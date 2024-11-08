@@ -86,7 +86,7 @@ def format_clojure_list(type_info: Tuple[str, List]) -> str:
     lines.append(";; Auto-generated method definitions")
     lines.append(f";; From {type_name}.java\n")
 
-    lines.append(f"\n(:class-name {type_name})\n")
+    lines.append(f"\n:java-name => {type_name}\n")
 
     for method in methods:
         if method[0] == 'constructor':
