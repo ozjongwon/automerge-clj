@@ -3,7 +3,8 @@
    [clojure.java.io :as io]
    [clojure.java.shell :as sh]
    [clojure.pprint :as pp]
-   [clojure.string :as str])
+   [clojure.string :as str]
+   [clojure.set :as set])
   (:import
    (org.automerge ChangeHash Document ObjectId)))
 
@@ -159,7 +160,7 @@
   (filter (fn [[_ _ params & _]]
             (-> (map first params)
                 (set)
-                (clojure.set/intersection  +unusable-classes+)
+                (set/intersection  +unusable-classes+)
                 (empty?)))
           defs))
 
