@@ -28,7 +28,6 @@
   (cond (nil? type) nil
 
         (= 'int type) "^Integer"
-
         (= 'long type) "^Long"
 
         (= 'boolean type) "^Boolean"
@@ -90,12 +89,12 @@
   "Group methods by number of arguments"
   (group-by #(count (nth % 2)) methods))
 
+(def +clj->java-types+ {:int 'Integer :long 'Long :double 'Double :boolean 'Boolean})
+
 (defn- type-check-expr [arg-num type-spec]
   (let [arg (symbol (str "arg" arg-num))]
     (cond (symbol? type-spec)
-          (cond (= type-spec 'int) `(~'integer? ~arg)
-                :else
-                `(~'instance? ~(symbol type-spec) ~arg))
+          `(~'instance? ~(get +clj->java-types+ (keyword type-spec) type-spec) ~arg)
 
           (and (vector? type-spec) (= :array-of (first type-spec)))
           (let [type (second type-spec)]
@@ -120,23 +119,7 @@
       ~(make-java-call-signature java-class
                                  java-fn
                                  `(~@(mapcat (fn [[type arg]] [(canonical-type type) arg]) arg-names))
-                                 opts)))
-  #_
-  (let [call-sign (make-java-call-signature java-class java-fn args)]
-    (if (empty? args)
-      `(.~obj ~java-fn)
-      (let [conditions (map-indexed
-                        (fn [idx [type _]]
-                          (type-check-expr (inc idx) type))
-                        args)
-            arg-names (map-indexed
-                       (fn [idx [type name]]
-                         [type (symbol (str "arg" (inc idx)))])
-                       args)]
-        `[~@(if (> (count conditions) 1)
-              `((~'and ~@conditions))
-              conditions)
-          (. ~obj ~java-fn ~@(mapcat (fn [[type arg]] [(canonical-type type) arg]) arg-names))]))))
+                                 opts))))
 
 (defn- make-arity-method [java-fn java-class methods arity opts]
   (let [arg-symbols (map #(symbol (str "arg" (inc %))) (range arity))
@@ -151,17 +134,19 @@
                                                                                    arg-symbols)))))
 
 (defn- generate-complex-multiple-arity-functions [java-fn java-class defs]
-  (assert  (apply = (map second defs)) (str "Return type must be same" java-fn defs))
-  (let [[fn-name return-type type+args & opts] (first defs)
-        grouped (group-by-arity defs)
-        arity-methods (map (fn [[arity methods]]
-                             (make-arity-method java-fn java-class methods arity opts))
-                           grouped)]
-    (pp/cl-format nil "(defn ~{~A~} ~A~%~{~2T(~A)~^~%~})~&"
-                  (when-let [result (canonical-type return-type)]
-                    result)
-                  fn-name
-                  arity-methods)))
+  (let [return-types (->> (map second defs) (filter identity))]
+    (when-not (empty? return-types)
+      (assert (apply = return-types) (str "Return type must be same, except nil(voide)" java-fn defs)))
+    (let [[fn-name _ type+args & opts] (first defs)
+          grouped (group-by-arity defs)
+          arity-methods (map (fn [[arity methods]]
+                               (make-arity-method java-fn java-class methods arity opts))
+                             grouped)]
+      (pp/cl-format nil "(defn ~{~A~} ~A~%~{~2T(~A)~^~%~})~&"
+                    (when-let [result (canonical-type (first return-types))]
+                      result)
+                    fn-name
+                    arity-methods))))
 
 (defn- generate-multy-arity-functions [java-fn java-class defs]
   (if (simple-case? defs)
@@ -173,7 +158,7 @@
     (generate-a-function java-fn java-class (first clj-defs))
     (generate-multy-arity-functions java-fn java-class clj-defs)))
 
-(defn generate-clojre-interface [filename]
+(defn generate-clojure-interface [filename]
   "Reads the file, processes each line, and returns a map of function names to their Clojure definitions."
   (with-open [reader (clojure.java.io/reader filename)]  ; Open the file for reading
     (let [reader (java.io.PushbackReader. reader)
@@ -191,10 +176,10 @@
                (if (= :eof java-name)
                  result
                  (recur (update result
-                                [java-name (second clj-name-return-args)] ;; key
+                                java-name
                                 (fnil conj [])
                                 clj-name-return-args)))))
-           (map (fn [[[jfn _] exp]]
+           (map (fn [[jfn exp]]
                   (generate-functions java-name [jfn exp])))))))
 
 (defonce special-case-functions 
@@ -242,7 +227,7 @@
                     jv-clj-name (str name ".clj")]]
         (sh/sh "bash" "-c" (str "cd src/python && source python-env/bin/activate && python3 parse-java.py " java-file))
         (pp/cl-format true "~&;;; Class ~A~2&" name)
-        (doseq [l (generate-clojre-interface (str "/tmp/" jv-clj-name))]
+        (doseq [l (generate-clojure-interface (str "/tmp/" jv-clj-name))]
           (println l))))))
 
 (comment
@@ -256,7 +241,7 @@
 
   (java->clojure-interface-file ["~/Work/automerge-java/lib/src/main/java/org/automerge/Document.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/Transaction.java"
-                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/Counter.java"
+                                 ;;"~/Work/automerge-java/lib/src/main/java/org/automerge/Counter.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/ChangeHash.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/Cursor.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/PatchLog.java"

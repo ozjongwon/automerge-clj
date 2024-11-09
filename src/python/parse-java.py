@@ -28,7 +28,7 @@ def format_type(java_type) -> str:
         return f"[:array-of {base_type}]"
     return base_type
 
-def parse_java_file(java_filename: str) -> Optional[Tuple[str, List[Tuple[str, str, List[Tuple[str, str]]]]]]:
+def parse_java_file(java_filename: str) -> Optional[Tuple[str, dict[str, List[Tuple[str, List[str]]]]]]:
     """
     Parse Java source file and extract type name and method information.
     Handles both classes and interfaces.
@@ -38,7 +38,7 @@ def parse_java_file(java_filename: str) -> Optional[Tuple[str, List[Tuple[str, s
             java_source = file.read()
 
         tree = javalang.parse.parse(java_source)
-        methods = []
+        methods = {}
         type_name = None
 
         # Handle both ClassDeclaration and InterfaceDeclaration
@@ -55,7 +55,7 @@ def parse_java_file(java_filename: str) -> Optional[Tuple[str, List[Tuple[str, s
                             param_type = format_type(param.type)
                             param_name = pascal_to_kebab(param.name)
                             params.append((param_type, param_name))
-                        methods.append(('constructor', type_name, params))
+                        methods[type_name] = methods.get(type_name, []) + [['constructor', params]]
 
             # Process methods for both classes and interfaces
             for method in node.methods:
@@ -69,15 +69,15 @@ def parse_java_file(java_filename: str) -> Optional[Tuple[str, List[Tuple[str, s
                         param_name = pascal_to_kebab(param.name)
                         params.append((param_type, param_name))
 
-                    methods.append(('method', method_name, params, return_type,
-                                    'true' if 'static' in method.modifiers else 'false'))
+                    methods[method_name] = methods.get(method_name, []) + [['method',params, return_type,
+                                                                          'true' if 'static' in method.modifiers else 'false']]
         return (type_name, methods)
 
     except Exception as e:
         print(f"Error processing file: {e}")
         return None
 
-def format_clojure_list(type_info: Tuple[str, List]) -> str:
+def format_clojure_list(type_info: Tuple[str, dict]) -> str:
     """
     Format the parsed method information into Clojure-style lists.
     """
@@ -89,24 +89,22 @@ def format_clojure_list(type_info: Tuple[str, List]) -> str:
 
     lines.append(f"\n:java-name => {type_name}\n")
 
-    for method in methods:
-        if method[0] == 'constructor':
-            # Format constructor
-            _, _, params = method
-            param_str = ' '.join(f"[{param_type} {param_name}]" for param_type, param_name in params)
-            constructor_name = f"make-{pascal_to_kebab(type_name)}"
+    for original_name, mdefs in methods.items():
+        for kind, params, *method_only in mdefs:
+            if method_only:
+                return_type, static_p = method_only
+                param_str = ' '.join(f"[{param_type} {param_name}]" for param_type, param_name in params)
+                formatted_name = f"{pascal_to_kebab(type_name)}-{pascal_to_kebab(original_name)}"
 
-            # Add the original name and formatted definition
-            lines.append(f"{type_name} => ({constructor_name} {type_name} ({param_str}) :constructor? true)")
+                # Add the original name and formatted definition
+                lines.append(f"{original_name} => ({formatted_name} {return_type} ({param_str}) :static? {static_p})")
+            else:
+                # Format constructor
+                param_str = ' '.join(f"[{param_type} {param_name}]" for param_type, param_name in params)
+                constructor_name = f"make-{pascal_to_kebab(type_name)}"
 
-        else:
-            # Format regular method
-            _, original_name, params, return_type, static_p = method
-            param_str = ' '.join(f"[{param_type} {param_name}]" for param_type, param_name in params)
-            formatted_name = f"{pascal_to_kebab(type_name)}-{pascal_to_kebab(original_name)}"
-
-            # Add the original name and formatted definition
-            lines.append(f"{original_name} => ({formatted_name} {return_type} ({param_str}) :static? {static_p})")
+                # Add the original name and formatted definition
+                lines.append(f"{type_name} => ({constructor_name} {type_name} ({param_str}) :constructor? true)")
 
     return '\n'.join(lines)
 

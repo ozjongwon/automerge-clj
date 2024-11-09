@@ -5,7 +5,7 @@
 (ns clojure.automerge-clj.automerge-interface
         (:import [java.util Optional List HashMap Date Iterator]
                  [org.automerge ObjectId ObjectType ExpandMark
-Document Transaction Counter ChangeHash Cursor PatchLog SyncState NewValue]))
+Document Transaction ChangeHash Cursor PatchLog SyncState NewValue]))
 
 (defonce +object-id-root+ ObjectId/ROOT)
 
@@ -25,20 +25,6 @@ Document Transaction Counter ChangeHash Cursor PatchLog SyncState NewValue]))
           c)))
 
 ;;; Class Document
-
-(defn ^Optional document-get-all
-  ([^Document document arg1 arg2]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2))
-        (.getAll document ^ObjectId arg1 ^String arg2)
-        (and (instance? ObjectId arg1) (integer? arg2))
-        (.getAll document ^ObjectId arg1 ^Integer arg2)
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2}))))
-  ([^Document document arg1 arg2 arg3]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2) (array-instance? ChangeHash arg3))
-        (.getAll document ^ObjectId arg1 ^String arg2 ^"[[[Lorg.automerge.ChangeHash;" arg3)
-        (and (instance? ObjectId arg1) (integer? arg2) (array-instance? ChangeHash arg3))
-        (.getAll document ^ObjectId arg1 ^Integer arg2 ^"[[[Lorg.automerge.ChangeHash;" arg3)
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
 
 (defn ^Cursor document-make-cursor
   ([^Document document ^ObjectId obj ^Long index]
@@ -60,118 +46,14 @@ Document Transaction Counter ChangeHash Cursor PatchLog SyncState NewValue]))
         (.fork document ^"[[[Lorg.automerge.ChangeHash;" arg1 ^bytes arg2)
         :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2})))))
 
-(defn ^List document-make-patches [^Document document ^PatchLog patch-log]
-  (.makePatches document patch-log))
-
-(defn ^Transaction document-start-transaction-at [^Document document ^PatchLog patch-log ^"[[[Lorg.automerge.ChangeHash;" heads]
-  (.startTransactionAt document patch-log heads))
-
-(defn  document-receive-sync-message
-  ([^Document document ^SyncState sync-state ^bytes message]
-   (.receiveSyncMessage document sync-state message))
-  ([^Document document ^SyncState sync-state ^PatchLog patch-log ^bytes message]
-   (.receiveSyncMessage document sync-state patch-log message)))
-
-(defn  document-apply-encoded-changes
-  ([^Document document ^bytes changes]
-   (.applyEncodedChanges document changes))
-  ([^Document document ^bytes changes ^PatchLog patch-log]
-   (.applyEncodedChanges document changes patch-log)))
-
-(defn ^"[[[Lorg.automerge.ChangeHash;" document-get-heads [^Document document]
-  (.getHeads document))
-
-(defn ^Optional document-map-entries
-  ([^Document document ^ObjectId obj]
-   (.mapEntries document obj))
-  ([^Document document ^ObjectId obj ^"[[[Lorg.automerge.ChangeHash;" heads]
-   (.mapEntries document obj heads)))
-
-(defn ^bytes document-get-actor-id [^Document document]
-  (.getActorId document))
-
-(defn ^bytes document-save [^Document document]
-  (.save document))
-
-(defn ^Optional document-get-object-type [^Document document ^ObjectId obj]
-  (.getObjectType document obj))
-
-(defn ^Optional document-get
-  ([^Document document arg1 arg2]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2))
-        (.get document ^ObjectId arg1 ^String arg2)
-        (and (instance? ObjectId arg1) (integer? arg2))
-        (.get document ^ObjectId arg1 ^Integer arg2)
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2}))))
-  ([^Document document arg1 arg2 arg3]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2) (array-instance? ChangeHash arg3))
-        (.get document ^ObjectId arg1 ^String arg2 ^"[[[Lorg.automerge.ChangeHash;" arg3)
-        (and (instance? ObjectId arg1) (integer? arg2) (array-instance? ChangeHash arg3))
-        (.get document ^ObjectId arg1 ^Integer arg2 ^"[[[Lorg.automerge.ChangeHash;" arg3)
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
-
-(defn ^Long document-lookup-cursor-index
-  ([^Document document ^ObjectId obj ^Cursor cursor]
-   (.lookupCursorIndex document obj cursor))
-  ([^Document document ^ObjectId obj ^Cursor cursor ^"[[[Lorg.automerge.ChangeHash;" heads]
-   (.lookupCursorIndex document obj cursor heads)))
-
-(defn ^List document-diff [^Document document ^"[[[Lorg.automerge.ChangeHash;" before ^"[[[Lorg.automerge.ChangeHash;" after]
-  (.diff document before after))
-
 (defn ^Document make-document
   ([]
    (Document.))
   ([^bytes actor-id]
    (Document. actor-id)))
 
-(defn ^Optional document-list-items
-  ([^Document document ^ObjectId obj]
-   (.listItems document obj))
-  ([^Document document ^ObjectId obj ^"[[[Lorg.automerge.ChangeHash;" heads]
-   (.listItems document obj heads)))
-
-(defn  document-free [^Document document]
-  (.free document))
-
-(defn ^Long document-length
-  ([^Document document ^ObjectId obj]
-   (.length document obj))
-  ([^Document document ^ObjectId obj ^"[[[Lorg.automerge.ChangeHash;" heads]
-   (.length document obj heads)))
-
-(defn ^HashMap document-get-marks-at-index
-  ([^Document document ^ObjectId obj ^Integer index]
-   (.getMarksAtIndex document obj index))
-  ([^Document document ^ObjectId obj ^Integer index ^"[[[Lorg.automerge.ChangeHash;" heads]
-   (.getMarksAtIndex document obj index heads)))
-
-(defn ^List document-marks
-  ([^Document document ^ObjectId obj]
-   (.marks document obj))
-  ([^Document document ^ObjectId obj ^"[[[Lorg.automerge.ChangeHash;" heads]
-   (.marks document obj heads)))
-
-(defn ^Document document-load [^bytes bytes]
-  (Document/load bytes))
-
 (defn ^Optional document-generate-sync-message [^Document document ^SyncState sync-state]
   (.generateSyncMessage document sync-state))
-
-(defn ^Optional document-keys
-  ([^Document document ^ObjectId obj]
-   (.keys document obj))
-  ([^Document document ^ObjectId obj ^"[[[Lorg.automerge.ChangeHash;" heads]
-   (.keys document obj heads)))
-
-(defn  document-merge
-  ([^Document document ^Document other]
-   (.merge document other))
-  ([^Document document ^Document other ^PatchLog patch-log]
-   (.merge document other patch-log)))
-
-(defn ^bytes document-encode-changes-since [^Document document ^"[[[Lorg.automerge.ChangeHash;" heads]
-  (.encodeChangesSince document heads))
 
 (defn ^Optional document-text
   ([^Document document ^ObjectId obj]
@@ -179,176 +61,275 @@ Document Transaction Counter ChangeHash Cursor PatchLog SyncState NewValue]))
   ([^Document document ^ObjectId obj ^"[[[Lorg.automerge.ChangeHash;" heads]
    (.text document obj heads)))
 
+(defn ^List document-diff [^Document document ^"[[[Lorg.automerge.ChangeHash;" before ^"[[[Lorg.automerge.ChangeHash;" after]
+  (.diff document before after))
+
+(defn ^Long document-lookup-cursor-index
+  ([^Document document ^ObjectId obj ^Cursor cursor]
+   (.lookupCursorIndex document obj cursor))
+  ([^Document document ^ObjectId obj ^Cursor cursor ^"[[[Lorg.automerge.ChangeHash;" heads]
+   (.lookupCursorIndex document obj cursor heads)))
+
+(defn ^Document document-load [^bytes bytes]
+  (Document/load bytes))
+
+(defn ^Optional document-get-object-type [^Document document ^ObjectId obj]
+  (.getObjectType document obj))
+
+(defn  document-apply-encoded-changes
+  ([^Document document ^bytes changes]
+   (.applyEncodedChanges document changes))
+  ([^Document document ^bytes changes ^PatchLog patch-log]
+   (.applyEncodedChanges document changes patch-log)))
+
+(defn ^Optional document-get-all
+  ([^Document document arg1 arg2]
+  (cond (and (instance? ObjectId arg1) (instance? String arg2))
+        (.getAll document ^ObjectId arg1 ^String arg2)
+        (and (instance? ObjectId arg1) (instance? Integer arg2))
+        (.getAll document ^ObjectId arg1 ^Integer arg2)
+        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2}))))
+  ([^Document document arg1 arg2 arg3]
+  (cond (and (instance? ObjectId arg1) (instance? String arg2) (array-instance? ChangeHash arg3))
+        (.getAll document ^ObjectId arg1 ^String arg2 ^"[[[Lorg.automerge.ChangeHash;" arg3)
+        (and (instance? ObjectId arg1) (instance? Integer arg2) (array-instance? ChangeHash arg3))
+        (.getAll document ^ObjectId arg1 ^Integer arg2 ^"[[[Lorg.automerge.ChangeHash;" arg3)
+        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
+
+(defn ^Optional document-get
+  ([^Document document arg1 arg2]
+  (cond (and (instance? ObjectId arg1) (instance? String arg2))
+        (.get document ^ObjectId arg1 ^String arg2)
+        (and (instance? ObjectId arg1) (instance? Integer arg2))
+        (.get document ^ObjectId arg1 ^Integer arg2)
+        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2}))))
+  ([^Document document arg1 arg2 arg3]
+  (cond (and (instance? ObjectId arg1) (instance? String arg2) (array-instance? ChangeHash arg3))
+        (.get document ^ObjectId arg1 ^String arg2 ^"[[[Lorg.automerge.ChangeHash;" arg3)
+        (and (instance? ObjectId arg1) (instance? Integer arg2) (array-instance? ChangeHash arg3))
+        (.get document ^ObjectId arg1 ^Integer arg2 ^"[[[Lorg.automerge.ChangeHash;" arg3)
+        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
+
 (defn ^Transaction document-start-transaction
   ([^Document document]
    (.startTransaction document))
   ([^Document document ^PatchLog patch-log]
    (.startTransaction document patch-log)))
 
+(defn ^bytes document-encode-changes-since [^Document document ^"[[[Lorg.automerge.ChangeHash;" heads]
+  (.encodeChangesSince document heads))
+
+(defn ^"[[[Lorg.automerge.ChangeHash;" document-get-heads [^Document document]
+  (.getHeads document))
+
+(defn  document-free [^Document document]
+  (.free document))
+
+(defn ^Transaction document-start-transaction-at [^Document document ^PatchLog patch-log ^"[[[Lorg.automerge.ChangeHash;" heads]
+  (.startTransactionAt document patch-log heads))
+
+(defn ^bytes document-save [^Document document]
+  (.save document))
+
+(defn  document-merge
+  ([^Document document ^Document other]
+   (.merge document other))
+  ([^Document document ^Document other ^PatchLog patch-log]
+   (.merge document other patch-log)))
+
+(defn ^Optional document-map-entries
+  ([^Document document ^ObjectId obj]
+   (.mapEntries document obj))
+  ([^Document document ^ObjectId obj ^"[[[Lorg.automerge.ChangeHash;" heads]
+   (.mapEntries document obj heads)))
+
+(defn ^Optional document-keys
+  ([^Document document ^ObjectId obj]
+   (.keys document obj))
+  ([^Document document ^ObjectId obj ^"[[[Lorg.automerge.ChangeHash;" heads]
+   (.keys document obj heads)))
+
+(defn ^Optional document-list-items
+  ([^Document document ^ObjectId obj]
+   (.listItems document obj))
+  ([^Document document ^ObjectId obj ^"[[[Lorg.automerge.ChangeHash;" heads]
+   (.listItems document obj heads)))
+
+(defn ^List document-make-patches [^Document document ^PatchLog patch-log]
+  (.makePatches document patch-log))
+
+(defn ^bytes document-get-actor-id [^Document document]
+  (.getActorId document))
+
+(defn ^Long document-length
+  ([^Document document ^ObjectId obj]
+   (.length document obj))
+  ([^Document document ^ObjectId obj ^"[[[Lorg.automerge.ChangeHash;" heads]
+   (.length document obj heads)))
+
+(defn ^List document-marks
+  ([^Document document ^ObjectId obj]
+   (.marks document obj))
+  ([^Document document ^ObjectId obj ^"[[[Lorg.automerge.ChangeHash;" heads]
+   (.marks document obj heads)))
+
+(defn ^HashMap document-get-marks-at-index
+  ([^Document document ^ObjectId obj ^Integer index]
+   (.getMarksAtIndex document obj index))
+  ([^Document document ^ObjectId obj ^Integer index ^"[[[Lorg.automerge.ChangeHash;" heads]
+   (.getMarksAtIndex document obj index heads)))
+
+(defn  document-receive-sync-message
+  ([^Document document ^SyncState sync-state ^bytes message]
+   (.receiveSyncMessage document sync-state message))
+  ([^Document document ^SyncState sync-state ^PatchLog patch-log ^bytes message]
+   (.receiveSyncMessage document sync-state patch-log message)))
+
 ;;; Class Transaction
-
-(defn  transaction-delete
-  ([^Transaction transaction arg1 arg2]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2))
-        (.delete transaction ^ObjectId arg1 ^String arg2)
-        (and (instance? ObjectId arg1) (instance? long arg2))
-        (.delete transaction ^ObjectId arg1 ^Long arg2)
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2})))))
-
-(defn  transaction-mark-null [^Transaction transaction ^ObjectId obj ^Long start ^Long end ^String mark-name ^ExpandMark expand]
-  (.markNull transaction obj start end mark-name expand))
-
-(defn  transaction-increment
-  ([^Transaction transaction arg1 arg2 arg3]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2) (instance? long arg3))
-        (.increment transaction ^ObjectId arg1 ^String arg2 ^Long arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? long arg3))
-        (.increment transaction ^ObjectId arg1 ^Long arg2 ^Long arg3)
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
-
-(defn  transaction-splice-text [^Transaction transaction ^ObjectId obj ^Long start ^Long delete-count ^String text]
-  (.spliceText transaction obj start delete-count text))
-
-(defn  transaction-insert
-  ([^Transaction transaction arg1 arg2 arg3]
-  (cond (and (instance? ObjectId arg1) (instance? long arg2) (instance? double arg3))
-        (.insert transaction ^ObjectId arg1 ^Long arg2 ^double arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? String arg3))
-        (.insert transaction ^ObjectId arg1 ^Long arg2 ^String arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (integer? arg3))
-        (.insert transaction ^ObjectId arg1 ^Long arg2 ^Integer arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (bytes? arg3))
-        (.insert transaction ^ObjectId arg1 ^Long arg2 ^bytes arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? Counter arg3))
-        (.insert transaction ^ObjectId arg1 ^Long arg2 ^Counter arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? Date arg3))
-        (.insert transaction ^ObjectId arg1 ^Long arg2 ^Date arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? boolean arg3))
-        (.insert transaction ^ObjectId arg1 ^Long arg2 ^Boolean arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? NewValue arg3))
-        (.insert transaction ^ObjectId arg1 ^Long arg2 ^NewValue arg3)
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
-
-(defn  transaction-mark-uint [^Transaction transaction ^ObjectId obj ^Long start ^Long end ^String mark-name ^Long value ^ExpandMark expand]
-  (.markUint transaction obj start end mark-name value expand))
-
-(defn ^Optional transaction-commit [^Transaction transaction]
-  (.commit transaction))
-
-(defn  transaction-close [^Transaction transaction]
-  (.close transaction))
 
 (defn ^ObjectId transaction-set
   ([^Transaction transaction arg1 arg2 arg3]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2) (instance? ObjectType arg3))
+  (cond (and (instance? ObjectId arg1) (instance? String arg2) (instance? String arg3))
+        (.set transaction ^ObjectId arg1 ^String arg2 ^String arg3)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? String arg3))
+        (.set transaction ^ObjectId arg1 ^Long arg2 ^String arg3)
+        (and (instance? ObjectId arg1) (instance? String arg2) (instance? Double arg3))
+        (.set transaction ^ObjectId arg1 ^String arg2 ^double arg3)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Double arg3))
+        (.set transaction ^ObjectId arg1 ^Long arg2 ^double arg3)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Integer arg3))
+        (.set transaction ^ObjectId arg1 ^Long arg2 ^Integer arg3)
+        (and (instance? ObjectId arg1) (instance? String arg2) (instance? Integer arg3))
+        (.set transaction ^ObjectId arg1 ^String arg2 ^Integer arg3)
+        (and (instance? ObjectId arg1) (instance? String arg2) (instance? NewValue arg3))
+        (.set transaction ^ObjectId arg1 ^String arg2 ^NewValue arg3)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? NewValue arg3))
+        (.set transaction ^ObjectId arg1 ^Long arg2 ^NewValue arg3)
+        (and (instance? ObjectId arg1) (instance? String arg2) (bytes? arg3))
+        (.set transaction ^ObjectId arg1 ^String arg2 ^bytes arg3)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (bytes? arg3))
+        (.set transaction ^ObjectId arg1 ^Long arg2 ^bytes arg3)
+        (and (instance? ObjectId arg1) (instance? String arg2) (instance? Boolean arg3))
+        (.set transaction ^ObjectId arg1 ^String arg2 ^Boolean arg3)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Boolean arg3))
+        (.set transaction ^ObjectId arg1 ^Long arg2 ^Boolean arg3)
+        (and (instance? ObjectId arg1) (instance? String arg2) (instance? Counter arg3))
+        (.set transaction ^ObjectId arg1 ^String arg2 ^Counter arg3)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Counter arg3))
+        (.set transaction ^ObjectId arg1 ^Long arg2 ^Counter arg3)
+        (and (instance? ObjectId arg1) (instance? String arg2) (instance? Date arg3))
+        (.set transaction ^ObjectId arg1 ^String arg2 ^Date arg3)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Date arg3))
+        (.set transaction ^ObjectId arg1 ^Long arg2 ^Date arg3)
+        (and (instance? ObjectId arg1) (instance? String arg2) (instance? ObjectType arg3))
         (.set transaction ^ObjectId arg1 ^String arg2 ^ObjectType arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? ObjectType arg3))
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? ObjectType arg3))
         (.set transaction ^ObjectId arg1 ^Long arg2 ^ObjectType arg3)
         :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
 
 (defn  transaction-rollback [^Transaction transaction]
   (.rollback transaction))
 
+(defn  transaction-mark-uint [^Transaction transaction ^ObjectId obj ^Long start ^Long end ^String mark-name ^Long value ^ExpandMark expand]
+  (.markUint transaction obj start end mark-name value expand))
+
+(defn  transaction-mark-null [^Transaction transaction ^ObjectId obj ^Long start ^Long end ^String mark-name ^ExpandMark expand]
+  (.markNull transaction obj start end mark-name expand))
+
+(defn ^ObjectId transaction-insert
+  ([^Transaction transaction arg1 arg2 arg3]
+  (cond (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Double arg3))
+        (.insert transaction ^ObjectId arg1 ^Long arg2 ^double arg3)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? String arg3))
+        (.insert transaction ^ObjectId arg1 ^Long arg2 ^String arg3)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Integer arg3))
+        (.insert transaction ^ObjectId arg1 ^Long arg2 ^Integer arg3)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (bytes? arg3))
+        (.insert transaction ^ObjectId arg1 ^Long arg2 ^bytes arg3)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Counter arg3))
+        (.insert transaction ^ObjectId arg1 ^Long arg2 ^Counter arg3)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Date arg3))
+        (.insert transaction ^ObjectId arg1 ^Long arg2 ^Date arg3)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Boolean arg3))
+        (.insert transaction ^ObjectId arg1 ^Long arg2 ^Boolean arg3)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? NewValue arg3))
+        (.insert transaction ^ObjectId arg1 ^Long arg2 ^NewValue arg3)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? ObjectType arg3))
+        (.insert transaction ^ObjectId arg1 ^Long arg2 ^ObjectType arg3)
+        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
+
+(defn  transaction-increment
+  ([^Transaction transaction arg1 arg2 arg3]
+  (cond (and (instance? ObjectId arg1) (instance? String arg2) (instance? Long arg3))
+        (.increment transaction ^ObjectId arg1 ^String arg2 ^Long arg3)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Long arg3))
+        (.increment transaction ^ObjectId arg1 ^Long arg2 ^Long arg3)
+        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
+
+(defn  transaction-splice [^Transaction transaction ^ObjectId obj ^Long start ^Long delete-count ^Iterator items]
+  (.splice transaction obj start delete-count items))
+
+(defn  transaction-splice-text [^Transaction transaction ^ObjectId obj ^Long start ^Long delete-count ^String text]
+  (.spliceText transaction obj start delete-count text))
+
+(defn  transaction-mark
+  ([^Transaction transaction arg1 arg2 arg3 arg4 arg5 arg6]
+  (cond (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Long arg3) (instance? String arg4) (instance? NewValue arg5) (instance? ExpandMark arg6))
+        (.mark transaction ^ObjectId arg1 ^Long arg2 ^Long arg3 ^String arg4 ^NewValue arg5 ^ExpandMark arg6)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Long arg3) (instance? String arg4) (instance? String arg5) (instance? ExpandMark arg6))
+        (.mark transaction ^ObjectId arg1 ^Long arg2 ^Long arg3 ^String arg4 ^String arg5 ^ExpandMark arg6)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Long arg3) (instance? String arg4) (instance? Long arg5) (instance? ExpandMark arg6))
+        (.mark transaction ^ObjectId arg1 ^Long arg2 ^Long arg3 ^String arg4 ^Long arg5 ^ExpandMark arg6)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Long arg3) (instance? String arg4) (instance? Double arg5) (instance? ExpandMark arg6))
+        (.mark transaction ^ObjectId arg1 ^Long arg2 ^Long arg3 ^String arg4 ^double arg5 ^ExpandMark arg6)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Long arg3) (instance? String arg4) (bytes? arg5) (instance? ExpandMark arg6))
+        (.mark transaction ^ObjectId arg1 ^Long arg2 ^Long arg3 ^String arg4 ^bytes arg5 ^ExpandMark arg6)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Long arg3) (instance? String arg4) (instance? Counter arg5) (instance? ExpandMark arg6))
+        (.mark transaction ^ObjectId arg1 ^Long arg2 ^Long arg3 ^String arg4 ^Counter arg5 ^ExpandMark arg6)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Long arg3) (instance? String arg4) (instance? Date arg5) (instance? ExpandMark arg6))
+        (.mark transaction ^ObjectId arg1 ^Long arg2 ^Long arg3 ^String arg4 ^Date arg5 ^ExpandMark arg6)
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Long arg3) (instance? String arg4) (instance? Boolean arg5) (instance? ExpandMark arg6))
+        (.mark transaction ^ObjectId arg1 ^Long arg2 ^Long arg3 ^String arg4 ^Boolean arg5 ^ExpandMark arg6)
+        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3, :arg4 arg4, :arg5 arg5, :arg6 arg6})))))
+
 (defn  transaction-insert-null [^Transaction transaction ^ObjectId obj ^Long index]
   (.insertNull transaction obj index))
 
-(defn  transaction-set
-  ([^Transaction transaction arg1 arg2 arg3]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2) (instance? String arg3))
-        (.set transaction ^ObjectId arg1 ^String arg2 ^String arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? String arg3))
-        (.set transaction ^ObjectId arg1 ^Long arg2 ^String arg3)
-        (and (instance? ObjectId arg1) (instance? String arg2) (instance? double arg3))
-        (.set transaction ^ObjectId arg1 ^String arg2 ^double arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? double arg3))
-        (.set transaction ^ObjectId arg1 ^Long arg2 ^double arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (integer? arg3))
-        (.set transaction ^ObjectId arg1 ^Long arg2 ^Integer arg3)
-        (and (instance? ObjectId arg1) (instance? String arg2) (integer? arg3))
-        (.set transaction ^ObjectId arg1 ^String arg2 ^Integer arg3)
-        (and (instance? ObjectId arg1) (instance? String arg2) (instance? NewValue arg3))
-        (.set transaction ^ObjectId arg1 ^String arg2 ^NewValue arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? NewValue arg3))
-        (.set transaction ^ObjectId arg1 ^Long arg2 ^NewValue arg3)
-        (and (instance? ObjectId arg1) (instance? String arg2) (bytes? arg3))
-        (.set transaction ^ObjectId arg1 ^String arg2 ^bytes arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (bytes? arg3))
-        (.set transaction ^ObjectId arg1 ^Long arg2 ^bytes arg3)
-        (and (instance? ObjectId arg1) (instance? String arg2) (instance? boolean arg3))
-        (.set transaction ^ObjectId arg1 ^String arg2 ^Boolean arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? boolean arg3))
-        (.set transaction ^ObjectId arg1 ^Long arg2 ^Boolean arg3)
-        (and (instance? ObjectId arg1) (instance? String arg2) (instance? Counter arg3))
-        (.set transaction ^ObjectId arg1 ^String arg2 ^Counter arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? Counter arg3))
-        (.set transaction ^ObjectId arg1 ^Long arg2 ^Counter arg3)
-        (and (instance? ObjectId arg1) (instance? String arg2) (instance? Date arg3))
-        (.set transaction ^ObjectId arg1 ^String arg2 ^Date arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? Date arg3))
-        (.set transaction ^ObjectId arg1 ^Long arg2 ^Date arg3)
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
-
-(defn  transaction-unmark [^Transaction transaction ^ObjectId obj ^String mark-name ^Long start ^Long end ^ExpandMark expand]
-  (.unmark transaction obj mark-name start end expand))
+(defn  transaction-delete
+  ([^Transaction transaction arg1 arg2]
+  (cond (and (instance? ObjectId arg1) (instance? String arg2))
+        (.delete transaction ^ObjectId arg1 ^String arg2)
+        (and (instance? ObjectId arg1) (instance? Long arg2))
+        (.delete transaction ^ObjectId arg1 ^Long arg2)
+        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2})))))
 
 (defn  transaction-set-uint
   ([^Transaction transaction arg1 arg2 arg3]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2) (instance? long arg3))
+  (cond (and (instance? ObjectId arg1) (instance? String arg2) (instance? Long arg3))
         (.setUint transaction ^ObjectId arg1 ^String arg2 ^Long arg3)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? long arg3))
+        (and (instance? ObjectId arg1) (instance? Long arg2) (instance? Long arg3))
         (.setUint transaction ^ObjectId arg1 ^Long arg2 ^Long arg3)
         :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
+
+(defn  transaction-close [^Transaction transaction]
+  (.close transaction))
+
+(defn  transaction-insert-uint [^Transaction transaction ^ObjectId obj ^Long index ^Long value]
+  (.insertUint transaction obj index value))
+
+(defn  transaction-unmark [^Transaction transaction ^ObjectId obj ^String mark-name ^Long start ^Long end ^ExpandMark expand]
+  (.unmark transaction obj mark-name start end expand))
 
 (defn  transaction-set-null
   ([^Transaction transaction arg1 arg2]
   (cond (and (instance? ObjectId arg1) (instance? String arg2))
         (.setNull transaction ^ObjectId arg1 ^String arg2)
-        (and (instance? ObjectId arg1) (instance? long arg2))
+        (and (instance? ObjectId arg1) (instance? Long arg2))
         (.setNull transaction ^ObjectId arg1 ^Long arg2)
         :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2})))))
 
-(defn  transaction-mark
-  ([^Transaction transaction arg1 arg2 arg3 arg4 arg5 arg6]
-  (cond (and (instance? ObjectId arg1) (instance? long arg2) (instance? long arg3) (instance? String arg4) (instance? NewValue arg5) (instance? ExpandMark arg6))
-        (.mark transaction ^ObjectId arg1 ^Long arg2 ^Long arg3 ^String arg4 ^NewValue arg5 ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? long arg3) (instance? String arg4) (instance? String arg5) (instance? ExpandMark arg6))
-        (.mark transaction ^ObjectId arg1 ^Long arg2 ^Long arg3 ^String arg4 ^String arg5 ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? long arg3) (instance? String arg4) (instance? long arg5) (instance? ExpandMark arg6))
-        (.mark transaction ^ObjectId arg1 ^Long arg2 ^Long arg3 ^String arg4 ^Long arg5 ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? long arg3) (instance? String arg4) (instance? double arg5) (instance? ExpandMark arg6))
-        (.mark transaction ^ObjectId arg1 ^Long arg2 ^Long arg3 ^String arg4 ^double arg5 ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? long arg3) (instance? String arg4) (bytes? arg5) (instance? ExpandMark arg6))
-        (.mark transaction ^ObjectId arg1 ^Long arg2 ^Long arg3 ^String arg4 ^bytes arg5 ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? long arg3) (instance? String arg4) (instance? Counter arg5) (instance? ExpandMark arg6))
-        (.mark transaction ^ObjectId arg1 ^Long arg2 ^Long arg3 ^String arg4 ^Counter arg5 ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? long arg3) (instance? String arg4) (instance? Date arg5) (instance? ExpandMark arg6))
-        (.mark transaction ^ObjectId arg1 ^Long arg2 ^Long arg3 ^String arg4 ^Date arg5 ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (instance? long arg2) (instance? long arg3) (instance? String arg4) (instance? boolean arg5) (instance? ExpandMark arg6))
-        (.mark transaction ^ObjectId arg1 ^Long arg2 ^Long arg3 ^String arg4 ^Boolean arg5 ^ExpandMark arg6)
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3, :arg4 arg4, :arg5 arg5, :arg6 arg6})))))
-
-(defn ^ObjectId transaction-insert [^Transaction transaction ^ObjectId parent ^Long index ^ObjectType obj-type]
-  (.insert transaction parent index obj-type))
-
-(defn  transaction-insert-uint [^Transaction transaction ^ObjectId obj ^Long index ^Long value]
-  (.insertUint transaction obj index value))
-
-(defn  transaction-splice [^Transaction transaction ^ObjectId obj ^Long start ^Long delete-count ^Iterator items]
-  (.splice transaction obj start delete-count items))
-
-;;; Class Counter
-
-(defn ^Counter make-counter [^Long value]
-  (Counter. value))
-
-(defn ^Long counter-get-value [^Counter counter]
-  (.getValue counter))
-
-(defn ^Integer counter-hash-code [^Counter counter]
-  (.hashCode counter))
-
-(defn ^Boolean counter-equals [^Counter counter ^Object obj]
-  (.equals counter obj))
+(defn ^Optional transaction-commit [^Transaction transaction]
+  (.commit transaction))
 
 ;;; Class ChangeHash
 
