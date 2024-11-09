@@ -153,10 +153,21 @@
     (generate-simple-multiple-arity-functions java-fn java-class defs)
     (generate-complex-multiple-arity-functions java-fn java-class  defs)))
 
+(def +unusable-classes+ #{'Counter})
+
+(defn remove-unusable-methods [defs]
+  (filter (fn [[_ _ params & _]]
+            (-> (map first params)
+                (set)
+                (clojure.set/intersection  +unusable-classes+)
+                (empty?)))
+          defs))
+
 (defn generate-functions [java-class [java-fn clj-defs]]
-  (if (= (count clj-defs) 1)
-    (generate-a-function java-fn java-class (first clj-defs))
-    (generate-multy-arity-functions java-fn java-class clj-defs)))
+  (let [filtered-defs (remove-unusable-methods clj-defs)]
+    (if (= (count clj-defs) 1)
+      (generate-a-function java-fn java-class (first filtered-defs))
+      (generate-multy-arity-functions java-fn java-class filtered-defs))))
 
 (defn generate-clojure-interface [filename]
   "Reads the file, processes each line, and returns a map of function names to their Clojure definitions."
