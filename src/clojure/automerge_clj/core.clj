@@ -16,7 +16,7 @@
        (document-free ~doc))))
 
 (defmacro with-text [[text tx] & body]
-  `(let [~text  (transaction-set ~tx +object-id-root+ "text" +object-type-text+)]
+  `(let [~text  (transaction-set ~tx ObjectId/ROOT "text" +object-type-text+)]
      ~@body))
 
 (defn splice
@@ -70,7 +70,7 @@
 
 (defn example-2 []
   (with-document-tx [doc tx]
-    (let [todo-list-oid (transaction-set tx +object-id-root+ "todos" +object-type-list+)]
+    (let [todo-list-oid (transaction-set tx ObjectId/ROOT "todos" +object-type-list+)]
       (transaction-insert tx todo-list-oid 0 "Go journey")
       (println "****" (document-get-heads doc))
       (transaction-insert tx todo-list-oid 0 "Go cycling")
@@ -78,7 +78,7 @@
 
 (def saved (let [alice-doc (make-document)
                  alice-tx (document-start-transaction alice-doc)
-                 todo-list (transaction-set alice-tx +object-id-root+ "todos" +object-type-list+)
+                 todo-list (transaction-set alice-tx ObjectId/ROOT "todos" +object-type-list+)
                  bob-doc (make-document)
                  bob-tx (document-start-transaction bob-doc)]
              (try (do
