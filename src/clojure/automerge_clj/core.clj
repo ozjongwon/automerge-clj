@@ -1,5 +1,7 @@
 (ns automerge-clj.core
-  (:use [clojure.automerge-clj.automerge-interface])
+  (:use [clojure.automerge-clj.automerge-interface]
+        [clojure.java.io :as io]
+        [clojure.data.codec.base64 :as b64])
   (:import [org.automerge ObjectId ObjectType ExpandMark
             Document Transaction ChangeHash Cursor PatchLog SyncState NewValue]))
 
@@ -40,8 +42,7 @@
      ~@body
      (transaction-commit ~tx)))
 
-
-(defn example []
+(defn example1 []
   (let [doc1 (atom nil)
         doc2 (atom nil)
         shared-text (atom nil)]
@@ -66,3 +67,60 @@
     (println "Actor -> " (document-get-actor-id @doc1))
     (document-free @doc1)
     (document-free @doc2)))
+
+(defn example-2 []
+  (with-document-tx [doc tx]
+    (let [todo-list-oid (transaction-set tx +object-id-root+ "todos" +object-type-list+)]
+      (transaction-insert tx todo-list-oid 0 "Go journey")
+      (println "****" (document-get-heads doc))
+      (transaction-insert tx todo-list-oid 0 "Go cycling")
+      (println "****" (document-get-heads doc)))))
+
+(def saved (let [alice-doc (make-document)
+                 alice-tx (document-start-transaction alice-doc)
+                 todo-list (transaction-set alice-tx +object-id-root+ "todos" +object-type-list+)
+                 bob-doc (make-document)
+                 bob-tx (document-start-transaction bob-doc)]
+             (try (do
+                    (transaction-insert alice-tx todo-list 0 "Buy groceries")
+                    (transaction-insert alice-tx todo-list 0 "Call dentist")
+                    (transaction-commit alice-tx)
+                    (document-save alice-doc)))))
+
+(def saved-str (b64-encode-str saved))
+
+(def bob-saved (let [bob-doc (document-load (b64-str->decoded-bytes saved-str))
+                     bob-tx (document-start-transaction bob-doc)]
+                 (document-get-heads bob-doc)))
+
+(defn b64-encode-str [byte-array]
+  (-> (b64/encode saved)
+      (String.)))
+
+(defn b64-str->decoded-bytes [str]
+  (-> (.getBytes str)
+      (b64/decode)))
+
+;; saved == byte array
+(def encoded (b64/encode saved))
+
+(def b64-encoded (b64/encode saved))
+(def b64-str (String. b64-encoded))
+(.getBytes b64-str) ;; back to b64-encoded
+(b64/decode b64-encoded)
+
+
+(def original-string "Hello, Clojure!")
+
+;; Step 1: Convert the string to bytes (UTF-8)
+(def byte-array (.getBytes original-string "UTF-8"))
+
+;; Step 2: Base64 encode the byte array
+(def encoded (b64/encode byte-array))
+
+(def encoded-str (String. encoded))
+
+(.getBytes encoded-str "UTF-8")
+(def decoded-bytes (b64/decode encoded))
+
+(def decoded-string (String. decoded-bytes "UTF-8"))
