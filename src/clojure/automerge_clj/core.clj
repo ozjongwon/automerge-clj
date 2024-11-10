@@ -124,4 +124,4 @@
 ;; (def decoded-bytes (b64/decode encoded))
 
 ;; (def decoded-string (String. decoded-bytes "UTF-8"))
-(example-1)
+;;(example-1)

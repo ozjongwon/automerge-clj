@@ -11,6 +11,4 @@
   :repl-options {:init (do (import [org.automerge ObjectId Document Transaction])
                            (let [doc (Document.)]
                              ObjectId/ROOT
-                             (.free doc)))}
-  ;;:jvm-opts ["-Djava.library.path=/home/jc/Work/automerge-clj/native/x86_64-unknown-linux-gnu/"]
-  )
+                             (.free doc)))})
