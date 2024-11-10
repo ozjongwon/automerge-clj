@@ -7,9 +7,13 @@
                  [org.automerge/automerge "0.0.7"]
                  [camel-snake-kebab "0.4.3"]
                  [org.clojure/data.codec "0.1.1"]
-                 [clojure.java-time "1.4.2"]]]
-  :repl-options {:init-ns clojure.automerge-clj.generate-interface
-                 :init (init-lib)}
+                 [clojure.java-time "1.4.2"]]
+  :repl-options {;;:init-ns clojure.automerge-clj.generate-interface
+                 :init (do (import [org.automerge ObjectId Document Transaction])
+                           (let [doc (Document.)]
+                             ObjectId/ROOT
+                             (.free doc)))
+                 }
   :jvm-opts ["-Djava.library.path=/home/jc/Work/automerge-clj/native/x86_64-unknown-linux-gnu/"]
 
   :java-source-paths ["src/java"]

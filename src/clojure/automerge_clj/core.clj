@@ -42,7 +42,7 @@
      ~@body
      (transaction-commit ~tx)))
 
-(defn example1 []
+(defn example-1 []
   (let [doc1 (atom nil)
         doc2 (atom nil)
         shared-text (atom nil)]
@@ -87,40 +87,41 @@
                     (transaction-commit alice-tx)
                     (document-save alice-doc)))))
 
-(def saved-str (b64-encode-str saved))
+;; (def saved-str (b64/b64-encode-str saved))
 
-(def bob-saved (let [bob-doc (document-load (b64-str->decoded-bytes saved-str))
-                     bob-tx (document-start-transaction bob-doc)]
-                 (document-get-heads bob-doc)))
+;; (def bob-saved (let [bob-doc (document-load (b64-str->decoded-bytes saved-str))
+;;                      bob-tx (document-start-transaction bob-doc)]
+;;                  (document-get-heads bob-doc)))
 
-(defn b64-encode-str [byte-array]
-  (-> (b64/encode saved)
-      (String.)))
+;; (defn b64-encode-str [byte-array]
+;;   (-> (b64/encode saved)
+;;       (String.)))
 
-(defn b64-str->decoded-bytes [str]
-  (-> (.getBytes str)
-      (b64/decode)))
+;; (defn b64-str->decoded-bytes [str]
+;;   (-> (.getBytes str)
+;;       (b64/decode)))
 
-;; saved == byte array
-(def encoded (b64/encode saved))
+;; ;; saved == byte array
+;; (def encoded (b64/encode saved))
 
-(def b64-encoded (b64/encode saved))
-(def b64-str (String. b64-encoded))
-(.getBytes b64-str) ;; back to b64-encoded
-(b64/decode b64-encoded)
+;; (def b64-encoded (b64/encode saved))
+;; (def b64-str (String. b64-encoded))
+;; (.getBytes b64-str) ;; back to b64-encoded
+;; (b64/decode b64-encoded)
 
 
-(def original-string "Hello, Clojure!")
+;; (def original-string "Hello, Clojure!")
 
-;; Step 1: Convert the string to bytes (UTF-8)
-(def byte-array (.getBytes original-string "UTF-8"))
+;; ;; Step 1: Convert the string to bytes (UTF-8)
+;; (def byte-array (.getBytes original-string "UTF-8"))
 
-;; Step 2: Base64 encode the byte array
-(def encoded (b64/encode byte-array))
+;; ;; Step 2: Base64 encode the byte array
+;; (def encoded (b64/encode byte-array))
 
-(def encoded-str (String. encoded))
+;; (def encoded-str (String. encoded))
 
-(.getBytes encoded-str "UTF-8")
-(def decoded-bytes (b64/decode encoded))
+;; (.getBytes encoded-str "UTF-8")
+;; (def decoded-bytes (b64/decode encoded))
 
-(def decoded-string (String. decoded-bytes "UTF-8"))
+;; (def decoded-string (String. decoded-bytes "UTF-8"))
+(example-1)
