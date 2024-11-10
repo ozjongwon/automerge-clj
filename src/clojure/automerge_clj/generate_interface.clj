@@ -195,9 +195,7 @@
                   (generate-functions java-name [jfn exp])))))))
 
 (defonce special-case-functions 
-  "(defonce +object-id-root+ ObjectId/ROOT)
-
-(defonce +object-type-map+ ObjectType/MAP)
+  "(defonce +object-type-map+ ObjectType/MAP)
 (defonce +object-type-list+ ObjectType/LIST)
 (defonce +object-type-text+ ObjectType/TEXT)
 
