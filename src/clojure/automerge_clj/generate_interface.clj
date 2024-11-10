@@ -9,9 +9,9 @@
    (org.automerge ChangeHash Document ObjectId)))
 
 (defn init-lib []
-  (Document.) ;; Native lib init happens
-  ObjectId/ROOT ;; Access lazy field
-  )
+  (let [doc (Document.)]   ;; Native lib init happens
+    ObjectId/ROOT          ;; Access lazy field
+    (.free doc)))
 
 (defn- simple-case? [defs]
   (let [num-arg-list (map #(count (nth %  2)) defs)]
