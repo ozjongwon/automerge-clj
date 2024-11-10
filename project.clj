@@ -6,7 +6,8 @@
   :dependencies [[org.clojure/clojure "1.12.0"]
                  [org.automerge/automerge "0.0.7"]
                  [camel-snake-kebab "0.4.3"]
-                 [org.clojure/data.codec "0.1.1"]]
+                 [org.clojure/data.codec "0.1.1"]
+                 [clojure.java-time "1.4.2"]]]
   :repl-options {:init-ns clojure.automerge-clj.generate-interface
                  :init (init-lib)}
   :jvm-opts ["-Djava.library.path=/home/jc/Work/automerge-clj/native/x86_64-unknown-linux-gnu/"]
