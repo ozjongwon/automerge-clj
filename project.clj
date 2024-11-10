@@ -8,15 +8,9 @@
                  [camel-snake-kebab "0.4.3"]
                  [org.clojure/data.codec "0.1.1"]
                  [clojure.java-time "1.4.2"]]
-  :repl-options {;;:init-ns clojure.automerge-clj.generate-interface
-                 :init (do (import [org.automerge ObjectId Document Transaction])
+  :repl-options {:init (do (import [org.automerge ObjectId Document Transaction])
                            (let [doc (Document.)]
                              ObjectId/ROOT
-                             (.free doc)))
-                 }
-  :jvm-opts ["-Djava.library.path=/home/jc/Work/automerge-clj/native/x86_64-unknown-linux-gnu/"]
-
-  :java-source-paths ["src/java"]
-  :profiles {:precomp {:source-paths ["src/java"]
-                       :aot [org.automerge] }}
-  :aliases {"generate-map" ["run" "bash" "-c" "source src/python/python-env/bin/activate && python3 src/python/parse-java.py"]})
+                             (.free doc)))}
+  ;;:jvm-opts ["-Djava.library.path=/home/jc/Work/automerge-clj/native/x86_64-unknown-linux-gnu/"]
+  )
