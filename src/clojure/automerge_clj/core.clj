@@ -1,7 +1,7 @@
 (ns automerge-clj.core
-  (:use [clojure.automerge-clj.automerge-interface]
-        [clojure.java.io :as io]
-        [clojure.data.codec.base64 :as b64])
+  (:use [clojure.automerge-clj.automerge-interface])
+  (:require [clojure.java.io :as io]
+            [clojure.data.codec.base64 :as b64])
   (:import [org.automerge ObjectId ObjectType ExpandMark
             Document Transaction ChangeHash Cursor PatchLog SyncState NewValue]))
 
