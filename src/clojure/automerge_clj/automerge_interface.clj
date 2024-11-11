@@ -1,11 +1,7 @@
-;;;
-;;; Generated file, do not edit
-;;;
-
 (ns clojure.automerge-clj.automerge-interface
         (:import [java.util Optional List HashMap Date Iterator]
                  [org.automerge ObjectId ObjectType ExpandMark
-Document Transaction ChangeHash Cursor PatchLog SyncState NewValue]))
+Document Transaction ChangeHash Cursor PatchLog SyncState NewValue AmValue]))
 
 (defonce +object-type-map+ ObjectType/MAP)
 (defonce +object-type-list+ ObjectType/LIST)
@@ -23,6 +19,7 @@ Document Transaction ChangeHash Cursor PatchLog SyncState NewValue]))
           c)))
 
 ;;; Class Document
+
 
 (defn ^Cursor document-make-cursor
   ([^Document document ^ObjectId obj ^Long index]
@@ -182,8 +179,8 @@ Document Transaction ChangeHash Cursor PatchLog SyncState NewValue]))
    (.receiveSyncMessage document sync-state message))
   ([^Document document ^SyncState sync-state ^PatchLog patch-log ^bytes message]
    (.receiveSyncMessage document sync-state patch-log message)))
-
 ;;; Class Transaction
+
 
 (defn ^ObjectId transaction-set
   ([^Transaction transaction arg1 arg2 arg3]
@@ -320,8 +317,8 @@ Document Transaction ChangeHash Cursor PatchLog SyncState NewValue]))
 
 (defn ^Optional transaction-commit [^Transaction transaction]
   (.commit transaction))
-
 ;;; Class ChangeHash
+
 
 (defn ^bytes change-hash-get-bytes [^ChangeHash changehash]
   (.getBytes changehash))
@@ -331,8 +328,8 @@ Document Transaction ChangeHash Cursor PatchLog SyncState NewValue]))
 
 (defn ^Boolean change-hash-equals [^ChangeHash changehash ^Object obj]
   (.equals changehash obj))
-
 ;;; Class Cursor
+
 
 (defn ^Cursor cursor-from-bytes [^bytes encoded]
   (Cursor/fromBytes encoded))
@@ -345,16 +342,16 @@ Document Transaction ChangeHash Cursor PatchLog SyncState NewValue]))
 
 (defn ^bytes cursor-to-bytes [^Cursor cursor]
   (.toBytes cursor))
-
 ;;; Class PatchLog
+
 
 (defn ^PatchLog make-patch-log []
   (PatchLog.))
 
 (defn  patch-log-free [^PatchLog patchlog]
   (.free patchlog))
-
 ;;; Class SyncState
+
 
 (defn ^SyncState make-sync-state []
   (SyncState.))
@@ -370,8 +367,8 @@ Document Transaction ChangeHash Cursor PatchLog SyncState NewValue]))
 
 (defn ^Boolean sync-state-is-in-sync [^SyncState syncstate ^Document doc]
   (.isInSync syncstate doc))
-
 ;;; Class NewValue
+
 
 (defn ^NewValue new-value-uint [^Long value]
   (NewValue/uint value))
@@ -396,4 +393,83 @@ Document Transaction ChangeHash Cursor PatchLog SyncState NewValue]))
 
 (defn ^NewValue new-value-timestamp [^Date value]
   (NewValue/timestamp value))
+;;; Class AmValue
 
+
+(defn ^Long u-int-get-value [^AmValue amvalue]
+  (.getValue amvalue))
+
+(defn ^Long int-get-value [^AmValue amvalue]
+  (.getValue amvalue))
+
+(defn ^Boolean bool-get-value [^AmValue amvalue]
+  (.getValue amvalue))
+
+(defn ^bytes bytes-get-value [^AmValue amvalue]
+  (.getValue amvalue))
+
+(defn ^String str-get-value [^AmValue amvalue]
+  (.getValue amvalue))
+
+(defn ^double f64-get-value [^AmValue amvalue]
+  (.getValue amvalue))
+
+(defn ^Long counter-get-value [^AmValue amvalue]
+  (.getValue amvalue))
+
+(defn ^Date timestamp-get-value [^AmValue amvalue]
+  (.getValue amvalue))
+
+(defn ^bytes unknown-get-value [^AmValue amvalue]
+  (.getValue amvalue))
+
+(defn ^String u-int-to-string [^AmValue amvalue]
+  (.toString amvalue))
+
+(defn ^String int-to-string [^AmValue amvalue]
+  (.toString amvalue))
+
+(defn ^String bool-to-string [^AmValue amvalue]
+  (.toString amvalue))
+
+(defn ^String bytes-to-string [^AmValue amvalue]
+  (.toString amvalue))
+
+(defn ^String str-to-string [^AmValue amvalue]
+  (.toString amvalue))
+
+(defn ^String f64-to-string [^AmValue amvalue]
+  (.toString amvalue))
+
+(defn ^String counter-to-string [^AmValue amvalue]
+  (.toString amvalue))
+
+(defn ^String timestamp-to-string [^AmValue amvalue]
+  (.toString amvalue))
+
+(defn ^String null-to-string [^AmValue amvalue]
+  (.toString amvalue))
+
+(defn ^String unknown-to-string [^AmValue amvalue]
+  (.toString amvalue))
+
+(defn ^String map-to-string [^AmValue amvalue]
+  (.toString amvalue))
+
+(defn ^String list-to-string [^AmValue amvalue]
+  (.toString amvalue))
+
+(defn ^String text-to-string [^AmValue amvalue]
+  (.toString amvalue))
+
+(defn ^Integer unknown-get-type-code [^AmValue amvalue]
+  (.getTypeCode amvalue))
+
+(defn ^ObjectId map-get-id [^AmValue amvalue]
+  (.getId amvalue))
+
+(defn ^ObjectId list-get-id [^AmValue amvalue]
+  (.getId amvalue))
+
+(defn ^ObjectId text-get-id [^AmValue amvalue]
+  (.getId amvalue))

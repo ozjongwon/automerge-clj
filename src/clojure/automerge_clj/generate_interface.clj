@@ -8,6 +8,8 @@
   (:import
    (org.automerge ChangeHash Document ObjectId)))
 
+(defonce ^:dynamic *fout* nil)
+
 (defn init-lib []
   (let [doc (Document.)]   ;; Native lib init happens
     ObjectId/ROOT          ;; Access lazy field
@@ -54,7 +56,7 @@
 (defn- generate-a-function [java-fn java-class def]
   (let [[fn-name return-type type+args & {:keys [static? constructor?] :as opts}] def
         [types args] (split-type+args type+args)]
-    (pp/cl-format nil "(defn ~{~A~} ~A [~{~A~^ ~}]~%~2T(~{~A~^ ~}))~&"
+    (pp/cl-format *fout* "~2&(defn ~{~A~} ~A [~{~A~^ ~}]~%~2T(~{~A~^ ~}))~&"
                   (when-let [result (canonical-type return-type)]
                     result)
                   fn-name
@@ -71,7 +73,7 @@
 (defn- generate-simple-multiple-arity-functions [java-fn java-class defs]
   (assert (apply = (map second defs)) "Return type must be same")
   (let [[fn-name return-type type+args & {:keys [static? constructor?] :as opts}] (first defs)]
-    (pp/cl-format nil "(defn ~{~A~} ~A~%~{~A~^~%~})~&"
+    (pp/cl-format *fout* "~2&(defn ~{~A~} ~A~%~{~A~^~%~})~&"
                   (when-let [result (canonical-type return-type)]
                     result)
                   fn-name
@@ -144,16 +146,19 @@
           arity-methods (map (fn [[arity methods]]
                                (make-arity-method java-fn java-class methods arity opts))
                              grouped)]
-      (pp/cl-format nil "(defn ~{~A~} ~A~%~{~2T(~A)~^~%~})~&"
+      (pp/cl-format *fout* "~2&(defn ~{~A~} ~A~%~{~2T(~A)~^~%~})~&"
                     (when-let [result (canonical-type return-type)]
                       result)
                     fn-name
                     arity-methods))))
 
 (defn- generate-multy-arity-functions [java-fn java-class defs]
-  (if (simple-case? defs)
-    (generate-simple-multiple-arity-functions java-fn java-class defs)
-    (generate-complex-multiple-arity-functions java-fn java-class  defs)))
+  (cond (= (count defs) (->> defs (map first) dedupe count))
+        (run! #(generate-a-function java-fn java-class %) defs)
+
+        (simple-case? defs) (generate-simple-multiple-arity-functions java-fn java-class defs)
+
+        :else (generate-complex-multiple-arity-functions java-fn java-class  defs)))
 
 (def +unusable-classes+ #{'Counter})
 
@@ -213,7 +218,7 @@
 
 (defn- interface-header [classes-to-import]
   (println ";;;\n;;; Generated file, do not edit\n;;;\n")
-  (pp/cl-format true "(ns clojure.automerge-clj.automerge-interface
+  (pp/cl-format *fout* "(ns clojure.automerge-clj.automerge-interface
         (:import [java.util Optional List HashMap Date Iterator]
                  [org.automerge ObjectId ObjectType ExpandMark~%~{~A~^ ~}]))~2&~A~2&"
                 classes-to-import
@@ -224,7 +229,7 @@
     (when (.exists file)
       (io/delete-file file)))
   (with-open [out (io/writer clj-file :append true)]
-    (binding [*out* out]
+    (binding [*fout* out]
       (interface-header (map (fn [f]
                                (-> (str/split f #"\/")
                                    last
@@ -237,7 +242,7 @@
                                  (str/split #"\."))
                     jv-clj-name (str name ".clj")]]
         (sh/sh "bash" "-c" (str "cd src/python && source python-env/bin/activate && python3 parse-java.py " java-file))
-        (pp/cl-format true "~&;;; Class ~A~2&" name)
+        (pp/cl-format *fout* "~&;;; Class ~A~2&" name)
         (doseq [l (generate-clojure-interface (str "/tmp/" jv-clj-name))]
           (println l))))))
 
