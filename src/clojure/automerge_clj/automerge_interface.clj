@@ -7,8 +7,6 @@
                  [org.automerge ObjectId ObjectType ExpandMark
 Document Transaction ChangeHash Cursor PatchLog SyncState NewValue]))
 
-(defonce +object-id-root+ ObjectId/ROOT)
-
 (defonce +object-type-map+ ObjectType/MAP)
 (defonce +object-type-list+ ObjectType/LIST)
 (defonce +object-type-text+ ObjectType/TEXT)
