@@ -264,8 +264,9 @@
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/SyncState.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/NewValue.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/AmValue.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/ObjectId.java"
                                  ;; "~/Work/automerge-java/lib/src/main/java/org/automerge/CommitResult.java"
-                                 ;; "~/Work/automerge-java/lib/src/main/java/org/automerge/ObjectId.java"
+
 
                                  ;; "~/Work/automerge-java/lib/src/main/java/org/automerge/ObjectType.java"
 
