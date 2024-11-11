@@ -135,16 +135,17 @@
                                                                                    arg-symbols)))))
 
 (defn- generate-complex-multiple-arity-functions [java-fn java-class defs]
-  (let [return-types (->> (map second defs) (filter identity))]
-    (when-not (empty? return-types)
-      (assert (apply = return-types) (str "Return type must be same, except nil(voide)" java-fn defs)))
+  (let [all-return-types (->> (map second defs) (filter identity))
+        return-type (when-not (or (empty? all-return-types)
+                                  (apply not= all-return-types))
+                      (first all-return-types))]
     (let [[fn-name _ type+args & opts] (first defs)
           grouped (group-by-arity defs)
           arity-methods (map (fn [[arity methods]]
                                (make-arity-method java-fn java-class methods arity opts))
                              grouped)]
       (pp/cl-format nil "(defn ~{~A~} ~A~%~{~2T(~A)~^~%~})~&"
-                    (when-let [result (canonical-type (first return-types))]
+                    (when-let [result (canonical-type return-type)]
                       result)
                     fn-name
                     arity-methods))))
@@ -257,6 +258,7 @@
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/PatchLog.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/SyncState.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/NewValue.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/AmValue.java"
                                  ;; "~/Work/automerge-java/lib/src/main/java/org/automerge/CommitResult.java"
                                  ;; "~/Work/automerge-java/lib/src/main/java/org/automerge/ObjectId.java"
 
