@@ -31,6 +31,7 @@
   (cond (nil? type) nil
 
         (= 'int type) "^Integer"
+        (= 'double type) "^Double"
         (= 'long type) "^Long"
 
         (= 'boolean type) "^Boolean"
