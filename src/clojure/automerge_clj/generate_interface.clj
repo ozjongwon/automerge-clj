@@ -49,23 +49,36 @@
   (when-not (or static? constructor?)
     [(canonical-type java-class) (symbol (str/lower-case java-class))]))
 
+(defn- maybe-call-converter [args]
+  (vec (mapcat (fn [[tp arg]]
+                 (case tp
+                   "^Long" `[~tp (~'long ~arg)]
+                   "^Integer" `[~tp (~'int ~arg)]
+                   "^Double" `[~tp (~'double ~arg)]
+                   "^Boolean" `[~tp (~'boolean ~arg)]
+                   [tp arg]))
+               (partition 2 args))))
+
 (defn- make-java-call-signature [java-class java-fn args & {:keys [static? constructor?]}]
-  (cond constructor? `(~(str java-class \.) ~@args)
-        static? `(~(str java-class "/" java-fn) ~@args)
-        :else `(~(str \. java-fn) ~(str/lower-case java-class) ~@args)))
+  (let [new-args (maybe-call-converter args)]
+    (cond constructor? `(~(str java-class \.) ~@new-args)
+          static? `(~(str java-class "/" java-fn) ~@new-args)
+          :else `(~(str \. java-fn) ~(str/lower-case java-class) ~@new-args))))
 
 (defn- generate-a-function [java-fn java-class def]
   (let [[fn-name return-type type+args & {:keys [static? constructor?] :as opts}] def
-        [types args] (split-type+args type+args)]
+        [types args] (split-type+args type+args)
+        canonicalized-args (mapcat (fn [type arg]
+                                     (list (canonical-type type) arg))
+                                   types args)
+        fn-args (take-nth 2 (rest canonicalized-args))]
     (pp/cl-format *fout* "~2&(defn ~{~A~} ~A [~{~A~^ ~}]~%~2T(~{~A~^ ~}))~&"
                   (when-let [result (canonical-type return-type)]
                     result)
                   fn-name
                   `(~@(make-main-instance-arg java-class opts)
-                    ~@(mapcat (fn [type arg]
-                                (list (canonical-type type) arg))
-                              types args))
-                  (make-java-call-signature java-class java-fn args opts))))
+                    ~@fn-args)
+                  (make-java-call-signature java-class java-fn canonicalized-args opts))))
 
 ;; (clojure.core/defn
 ;;   document-generate-sync-message
@@ -79,24 +92,21 @@
                     result)
                   fn-name
                   (for [[_ _ type+args] defs
-                        :let [[types args] (split-type+args type+args)]]
+                        :let [[types args] (split-type+args type+args)
+                              canonicalized-args (mapcat (fn [type arg]
+                                                           (list (canonical-type type) arg))
+                                                         types args)
+                              fn-args (take-nth 2 (rest canonicalized-args))]]
                     (pp/cl-format nil "~2T([~{~A~^ ~}]~%~2T (~{~A~^ ~}))"
                                   `(~@(make-main-instance-arg java-class opts)
-                                    ~@(mapcat (fn [type arg]
-                                                (list (canonical-type type) arg))
-                                              types args))
-                                  (make-java-call-signature java-class java-fn args opts))))))
+                                    ~@fn-args)
+                                  (make-java-call-signature java-class java-fn canonicalized-args opts))))))
 ;;;
 ;;; Multiple arity case
 ;;;
 (defn- group-by-arity [methods]
   "Group methods by number of arguments"
   (group-by #(count (nth % 2)) methods))
-
-(defn- long? [x]
-  (and (integer? x)
-       (or (> x Integer/MAX_VALUE)
-           (< x Integer/MIN_VALUE))))
 
 (defn clj-type-predicate [type-spec]
   (case type-spec
@@ -224,6 +234,10 @@
 (defonce +expand-mark-both+ ExpandMark/BOTH)
 (defonce +expand-mark-none+ ExpandMark/NONE)
 
+(defn- long? [x]
+  (and (integer? x)
+       (or (> x Integer/MAX_VALUE)
+           (< x Integer/MIN_VALUE))))
 
 (defn- array-instance? [c o]
   (and (-> o class .isArray)
@@ -231,12 +245,13 @@
           c)))")
 
 (defn- interface-header [classes-to-import]
-  (println ";;;\n;;; Generated file, do not edit\n;;;\n")
-  (pp/cl-format *fout* "(ns clojure.automerge-clj.automerge-interface
+  (binding [*out* *fout*]
+    (println ";;;\n;;; Generated file, do not edit\n;;;\n")
+    (pp/cl-format *fout* "(ns clojure.automerge-clj.automerge-interface
         (:import [java.util Optional List HashMap Date Iterator]
                  [org.automerge ObjectId ObjectType ExpandMark~%~{~A~^ ~}]))~2&~A~2&"
-                classes-to-import
-                special-case-functions))
+                  classes-to-import
+                  special-case-functions)))
 
 (defn java->clojure-interface-file [java-files clj-file]
   (let [file (io/file clj-file)]
@@ -258,7 +273,8 @@
         (sh/sh "bash" "-c" (str "cd src/python && source python-env/bin/activate && python3 parse-java.py " java-file))
         (pp/cl-format *fout* "~&;;; Class ~A~2&" name)
         (doseq [l (generate-clojure-interface (str "/tmp/" jv-clj-name))]
-          (println l))))))
+          (binding [*out* *fout*]
+            (println l)))))))
 
 (comment
   (defn array-instance? [c o]
