@@ -2,8 +2,7 @@
   (:use [clojure.automerge-clj.automerge-interface])
   (:require [clojure.java.io :as io]
             [clojure.data.codec.base64 :as b64])
-  (:import [org.automerge ObjectId ObjectType ExpandMark Document Transaction
-            ChangeHash Cursor PatchLog SyncState NewValue AmValue$List]))
+  (:import [org.automerge ObjectId]))
 
 (defmacro with-document-tx [[doc tx & {:keys [free? commit? actor]}] & body]
   `(let [~doc ~(if actor
@@ -67,7 +66,7 @@
      (transaction-commit ~tx)))
 
 (defn b64-encode-str [byte-array]
-  (-> (b64/encode saved)
+  (-> (b64/encode byte-array)
       (String.)))
 
 (defn b64-str->decoded-bytes [str]
@@ -78,33 +77,6 @@
 (defn optional->nilable [x]
   (when (.isPresent x)
     (.get x)))
-
-(-> (let [doc (make-document)
-          tx (document-start-transaction doc)]
-      (try (let [text (transaction-set tx org.automerge.ObjectId/ROOT "text" +object-type-text+)]
-             (splice tx text "Hello World")
-             (transaction-commit tx)
-             (document-save doc))
-           (finally (document-free doc))))
-
-    (document-load)
-    (document-get ObjectId/ROOT "text")
-    (optional->nilable))
-
-(let [doc (make-document)
-      tx (document-start-transaction doc)
-      lobj (-> (try (let [list (transaction-set tx org.automerge.ObjectId/ROOT "list1" +object-type-list+)]
-                      (transaction-insert tx list 0 "How to deal with Conflicts??")
-                      (transaction-commit tx)
-                      (document-save doc))
-                    (finally (document-free doc)))
-               (document-load)
-               (document-get ObjectId/ROOT "list1")
-               (optional->nilable)
-               (.getId))]
-  (document-get doc lobj 0))
-
-
 
 
 (defn example-1 []
@@ -131,42 +103,66 @@
     ;; (document-free @doc2)
     ))
 
-(example-1)
+(comment
+  (let [doc (make-document)
+        tx (document-start-transaction doc)
+        new-doc (-> (try (let [list (transaction-set tx org.automerge.ObjectId/ROOT "list1" +object-type-list+)]
+                           (transaction-insert tx list 0 "How to deal with Conflicts??")
+                           (transaction-commit tx)
+                           (document-save doc))
+                         (finally (document-free doc)))
+                    (document-load))
+        amval (-> (document-get ObjectId/ROOT "list1")
+                  (optional->nilable))]
+    [doc amval])
 
-(defn example-2 []
-  (with-document-tx [doc tx]
-    (let [todo-list-oid (transaction-set tx ObjectId/ROOT "todos" +object-type-list+)]
-      (transaction-insert tx todo-list-oid 0 "Go journey")
-      (println "****" (document-get-heads doc))
-      (transaction-insert tx todo-list-oid 0 "Go cycling")
-      (println "****" (document-get-heads doc)))))
+  (let [doc (make-document)
+        tx (document-start-transaction doc)
+        new-doc (-> (try (let [list (transaction-set tx org.automerge.ObjectId/ROOT "list1" +object-type-list+)]
+                           (transaction-insert tx list 0 "How to deal with Conflicts??")
+                           (transaction-commit tx)
+                           (document-save doc))
+                         (finally (document-free doc)))
+                    (document-load))
+        amval (-> (document-get new-doc ObjectId/ROOT "list1")
+                  (optional->nilable))]
+    [doc amval])
 
-(def saved (let [alice-doc (make-document)
-                 alice-tx (document-start-transaction alice-doc)
-                 todo-list (transaction-set alice-tx ObjectId/ROOT "todos" +object-type-list+)
-                 bob-doc (make-document)
-                 bob-tx (document-start-transaction bob-doc)]
-             (try (do
-                    (transaction-insert alice-tx todo-list 0 "Buy groceries")
-                    (transaction-insert alice-tx todo-list 0 "Call dentist")
-                    (transaction-commit alice-tx)
-                    (document-save alice-doc)))))
+  (defn example-2 []
+    (with-document-tx [doc tx]
+      (let [todo-list-oid (transaction-set tx ObjectId/ROOT "todos" +object-type-list+)]
+        (transaction-insert tx todo-list-oid 0 "Go journey")
+        (println "****" (document-get-heads doc))
+        (transaction-insert tx todo-list-oid 0 "Go cycling")
+        (println "****" (document-get-heads doc)))))
 
-(example-2)
+  (def saved (let [alice-doc (make-document)
+                   alice-tx (document-start-transaction alice-doc)
+                   todo-list (transaction-set alice-tx ObjectId/ROOT "todos" +object-type-list+)
+                   bob-doc (make-document)
+                   bob-tx (document-start-transaction bob-doc)]
+               (try (do
+                      (transaction-insert alice-tx todo-list 0 "Buy groceries")
+                      (transaction-insert alice-tx todo-list 0 "Call dentist")
+                      (transaction-commit alice-tx)
+                      (document-save alice-doc)))))
 
-(defn b64-encode-str [byte-array]
-  (-> (b64/encode saved)
-      (String.)))
+  (example-2)
 
-(defn b64-str->decoded-bytes [str]
-  (-> (.getBytes str)
-      (b64/decode)))
+  (defn b64-encode-str [byte-array]
+    (-> (b64/encode saved)
+        (String.)))
 
-(def saved-str (b64-encode-str saved))
-(println (b64-str->decoded-bytes saved-str) saved)
+  (defn b64-str->decoded-bytes [str]
+    (-> (.getBytes str)
+        (b64/decode)))
 
-(def bob-saved (let [bob-doc (document-load (b64-str->decoded-bytes saved-str))
-                     bob-tx (document-start-transaction bob-doc)]
-                 (document-get-heads bob-doc)))
+  (def saved-str (b64-encode-str saved))
+  (println (b64-str->decoded-bytes saved-str) saved)
 
-(= (seq (b64-str->decoded-bytes saved-str)) (seq saved))
+  (def bob-saved (let [bob-doc (document-load (b64-str->decoded-bytes saved-str))
+                       bob-tx (document-start-transaction bob-doc)]
+                   (document-get-heads bob-doc)))
+
+  (= (seq (b64-str->decoded-bytes saved-str)) (seq saved))
+  )
