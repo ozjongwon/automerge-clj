@@ -39,12 +39,18 @@ def parse_java_file(java_filename: str) -> Optional[Tuple[str, dict[str, List[Tu
 
         tree = javalang.parse.parse(java_source)
         methods = {}
+        outer_class = None
+        inner_class = None
         type_name = None
 
         # Handle both ClassDeclaration and InterfaceDeclaration
         for path, node in tree.filter(javalang.tree.TypeDeclaration):
-            if type_name is None:
-                type_name = node.name
+            if outer_class is None:
+                outer_class = node.name
+                type_name = outer_class
+            else:
+                inner_class = node.name
+                type_name = f"{outer_class}${inner_class}"
 
             # Process constructors only if it's a class
             if isinstance(node, javalang.tree.ClassDeclaration):
@@ -69,9 +75,12 @@ def parse_java_file(java_filename: str) -> Optional[Tuple[str, dict[str, List[Tu
                         param_name = pascal_to_kebab(param.name)
                         params.append((param_type, param_name))
 
-                    methods[method_name] = methods.get(method_name, []) + [['method',params, return_type,
-                                                                          'true' if 'static' in method.modifiers else 'false']]
-        return (type_name, methods)
+                    static_p = 'true' if 'static' in method.modifiers else 'false'
+                    inner_class = None if static_p == 'true' else inner_class
+
+                    methods[method_name] = methods.get(method_name, []) + [['method', params, return_type,
+                                                                            outer_class, inner_class, static_p]]
+        return (outer_class, methods)
 
     except Exception as e:
         print(f"Error processing file: {e}")
@@ -92,10 +101,9 @@ def format_clojure_list(type_info: Tuple[str, dict]) -> str:
     for original_name, mdefs in methods.items():
         for kind, params, *method_only in mdefs:
             if method_only:
-                return_type, static_p = method_only
+                return_type, outer_class, inner_class, static_p = method_only
                 param_str = ' '.join(f"[{param_type} {param_name}]" for param_type, param_name in params)
-                formatted_name = f"{pascal_to_kebab(type_name)}-{pascal_to_kebab(original_name)}"
-
+                formatted_name = f"{pascal_to_kebab(outer_class)}-{pascal_to_kebab(original_name)}" if inner_class == None else f"{pascal_to_kebab(inner_class)}-{pascal_to_kebab(original_name)}"
                 # Add the original name and formatted definition
                 lines.append(f"{original_name} => ({formatted_name} {return_type} ({param_str}) :static? {static_p})")
             else:
