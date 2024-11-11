@@ -9,6 +9,7 @@
                  [org.clojure/data.codec "0.1.1"]
                  [clojure.java-time "1.4.2"]]
   :repl-options {:init (do (import [org.automerge ObjectId Document Transaction])
+                           ;; Loading Automerge shared library
                            (let [doc (Document.)]
                              ObjectId/ROOT
                              (.free doc)))})
