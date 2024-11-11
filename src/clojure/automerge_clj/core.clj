@@ -112,7 +112,7 @@
                            (document-save doc))
                          (finally (document-free doc)))
                     (document-load))
-        amval (-> (document-get ObjectId/ROOT "list1")
+        amval (-> (document-get new-doc ObjectId/ROOT "list1")
                   (optional->nilable))]
     [doc amval])
 

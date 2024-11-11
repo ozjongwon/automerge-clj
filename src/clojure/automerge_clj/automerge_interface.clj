@@ -16,12 +16,7 @@ Document Transaction ChangeHash Cursor PatchLog SyncState NewValue AmValue Objec
 (defonce +expand-mark-both+ ExpandMark/BOTH)
 (defonce +expand-mark-none+ ExpandMark/NONE)
 
-(defn- long? [x]
-  (and (integer? x)
-       (or (> x Integer/MAX_VALUE)
-           (< x Integer/MIN_VALUE))))
-
-(defn- array-instance? [c o]
+(defn array-instance? [c o]
   (and (-> o class .isArray)
        (= (-> o class .getComponentType)
           c)))
@@ -222,35 +217,35 @@ nil
   ([^Transaction transaction arg1 arg2 arg3]
   (cond (and (instance? ObjectId arg1) (instance? String arg2) (instance? String arg3))
         (.set transaction ^ObjectId arg1 ^String arg2 ^String arg3)
-        (and (instance? ObjectId arg1) (long? arg2) (instance? String arg3))
+        (and (instance? ObjectId arg1) (integer? arg2) (instance? String arg3))
         (.set transaction ^ObjectId arg1 ^Long (long arg2) ^String arg3)
         (and (instance? ObjectId arg1) (instance? String arg2) (double? arg3))
         (.set transaction ^ObjectId arg1 ^String arg2 ^Double (double arg3))
-        (and (instance? ObjectId arg1) (long? arg2) (double? arg3))
+        (and (instance? ObjectId arg1) (integer? arg2) (double? arg3))
         (.set transaction ^ObjectId arg1 ^Long (long arg2) ^Double (double arg3))
-        (and (instance? ObjectId arg1) (long? arg2) (integer? arg3))
+        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3))
         (.set transaction ^ObjectId arg1 ^Long (long arg2) ^Integer (int arg3))
         (and (instance? ObjectId arg1) (instance? String arg2) (integer? arg3))
         (.set transaction ^ObjectId arg1 ^String arg2 ^Integer (int arg3))
         (and (instance? ObjectId arg1) (instance? String arg2) (instance? NewValue arg3))
         (.set transaction ^ObjectId arg1 ^String arg2 ^NewValue arg3)
-        (and (instance? ObjectId arg1) (long? arg2) (instance? NewValue arg3))
+        (and (instance? ObjectId arg1) (integer? arg2) (instance? NewValue arg3))
         (.set transaction ^ObjectId arg1 ^Long (long arg2) ^NewValue arg3)
         (and (instance? ObjectId arg1) (instance? String arg2) (bytes? arg3))
         (.set transaction ^ObjectId arg1 ^String arg2 ^bytes arg3)
-        (and (instance? ObjectId arg1) (long? arg2) (bytes? arg3))
+        (and (instance? ObjectId arg1) (integer? arg2) (bytes? arg3))
         (.set transaction ^ObjectId arg1 ^Long (long arg2) ^bytes arg3)
         (and (instance? ObjectId arg1) (instance? String arg2) (boolean? arg3))
         (.set transaction ^ObjectId arg1 ^String arg2 ^Boolean (boolean arg3))
-        (and (instance? ObjectId arg1) (long? arg2) (boolean? arg3))
+        (and (instance? ObjectId arg1) (integer? arg2) (boolean? arg3))
         (.set transaction ^ObjectId arg1 ^Long (long arg2) ^Boolean (boolean arg3))
         (and (instance? ObjectId arg1) (instance? String arg2) (instance? Date arg3))
         (.set transaction ^ObjectId arg1 ^String arg2 ^Date arg3)
-        (and (instance? ObjectId arg1) (long? arg2) (instance? Date arg3))
+        (and (instance? ObjectId arg1) (integer? arg2) (instance? Date arg3))
         (.set transaction ^ObjectId arg1 ^Long (long arg2) ^Date arg3)
         (and (instance? ObjectId arg1) (instance? String arg2) (instance? ObjectType arg3))
         (.set transaction ^ObjectId arg1 ^String arg2 ^ObjectType arg3)
-        (and (instance? ObjectId arg1) (long? arg2) (instance? ObjectType arg3))
+        (and (instance? ObjectId arg1) (integer? arg2) (instance? ObjectType arg3))
         (.set transaction ^ObjectId arg1 ^Long (long arg2) ^ObjectType arg3)
         :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
 nil
@@ -269,30 +264,30 @@ nil
 
 (defn ^ObjectId transaction-insert
   ([^Transaction transaction arg1 arg2 arg3]
-  (cond (and (instance? ObjectId arg1) (long? arg2) (double? arg3))
+  (cond (and (instance? ObjectId arg1) (integer? arg2) (double? arg3))
         (.insert transaction ^ObjectId arg1 ^Long (long arg2) ^Double (double arg3))
-        (and (instance? ObjectId arg1) (long? arg2) (instance? String arg3))
+        (and (instance? ObjectId arg1) (integer? arg2) (instance? String arg3))
         (.insert transaction ^ObjectId arg1 ^Long (long arg2) ^String arg3)
-        (and (instance? ObjectId arg1) (long? arg2) (integer? arg3))
+        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3))
         (.insert transaction ^ObjectId arg1 ^Long (long arg2) ^Integer (int arg3))
-        (and (instance? ObjectId arg1) (long? arg2) (bytes? arg3))
+        (and (instance? ObjectId arg1) (integer? arg2) (bytes? arg3))
         (.insert transaction ^ObjectId arg1 ^Long (long arg2) ^bytes arg3)
-        (and (instance? ObjectId arg1) (long? arg2) (instance? Date arg3))
+        (and (instance? ObjectId arg1) (integer? arg2) (instance? Date arg3))
         (.insert transaction ^ObjectId arg1 ^Long (long arg2) ^Date arg3)
-        (and (instance? ObjectId arg1) (long? arg2) (boolean? arg3))
+        (and (instance? ObjectId arg1) (integer? arg2) (boolean? arg3))
         (.insert transaction ^ObjectId arg1 ^Long (long arg2) ^Boolean (boolean arg3))
-        (and (instance? ObjectId arg1) (long? arg2) (instance? NewValue arg3))
+        (and (instance? ObjectId arg1) (integer? arg2) (instance? NewValue arg3))
         (.insert transaction ^ObjectId arg1 ^Long (long arg2) ^NewValue arg3)
-        (and (instance? ObjectId arg1) (long? arg2) (instance? ObjectType arg3))
+        (and (instance? ObjectId arg1) (integer? arg2) (instance? ObjectType arg3))
         (.insert transaction ^ObjectId arg1 ^Long (long arg2) ^ObjectType arg3)
         :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
 nil
 
 (defn  transaction-increment
   ([^Transaction transaction arg1 arg2 arg3]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2) (long? arg3))
+  (cond (and (instance? ObjectId arg1) (instance? String arg2) (integer? arg3))
         (.increment transaction ^ObjectId arg1 ^String arg2 ^Long (long arg3))
-        (and (instance? ObjectId arg1) (long? arg2) (long? arg3))
+        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3))
         (.increment transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3))
         :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
 nil
@@ -307,19 +302,19 @@ nil
 
 (defn  transaction-mark
   ([^Transaction transaction arg1 arg2 arg3 arg4 arg5 arg6]
-  (cond (and (instance? ObjectId arg1) (long? arg2) (long? arg3) (instance? String arg4) (instance? NewValue arg5) (instance? ExpandMark arg6))
+  (cond (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3) (instance? String arg4) (instance? NewValue arg5) (instance? ExpandMark arg6))
         (.mark transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3) ^String arg4 ^NewValue arg5 ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (long? arg2) (long? arg3) (instance? String arg4) (instance? String arg5) (instance? ExpandMark arg6))
+        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3) (instance? String arg4) (instance? String arg5) (instance? ExpandMark arg6))
         (.mark transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3) ^String arg4 ^String arg5 ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (long? arg2) (long? arg3) (instance? String arg4) (long? arg5) (instance? ExpandMark arg6))
+        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3) (instance? String arg4) (integer? arg5) (instance? ExpandMark arg6))
         (.mark transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3) ^String arg4 ^Long (long arg5) ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (long? arg2) (long? arg3) (instance? String arg4) (double? arg5) (instance? ExpandMark arg6))
+        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3) (instance? String arg4) (double? arg5) (instance? ExpandMark arg6))
         (.mark transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3) ^String arg4 ^Double (double arg5) ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (long? arg2) (long? arg3) (instance? String arg4) (bytes? arg5) (instance? ExpandMark arg6))
+        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3) (instance? String arg4) (bytes? arg5) (instance? ExpandMark arg6))
         (.mark transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3) ^String arg4 ^bytes arg5 ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (long? arg2) (long? arg3) (instance? String arg4) (instance? Date arg5) (instance? ExpandMark arg6))
+        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3) (instance? String arg4) (instance? Date arg5) (instance? ExpandMark arg6))
         (.mark transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3) ^String arg4 ^Date arg5 ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (long? arg2) (long? arg3) (instance? String arg4) (boolean? arg5) (instance? ExpandMark arg6))
+        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3) (instance? String arg4) (boolean? arg5) (instance? ExpandMark arg6))
         (.mark transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3) ^String arg4 ^Boolean (boolean arg5) ^ExpandMark arg6)
         :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3, :arg4 arg4, :arg5 arg5, :arg6 arg6})))))
 nil
@@ -332,16 +327,16 @@ nil
   ([^Transaction transaction arg1 arg2]
   (cond (and (instance? ObjectId arg1) (instance? String arg2))
         (.delete transaction ^ObjectId arg1 ^String arg2)
-        (and (instance? ObjectId arg1) (long? arg2))
+        (and (instance? ObjectId arg1) (integer? arg2))
         (.delete transaction ^ObjectId arg1 ^Long (long arg2))
         :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2})))))
 nil
 
 (defn  transaction-set-uint
   ([^Transaction transaction arg1 arg2 arg3]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2) (long? arg3))
+  (cond (and (instance? ObjectId arg1) (instance? String arg2) (integer? arg3))
         (.setUint transaction ^ObjectId arg1 ^String arg2 ^Long (long arg3))
-        (and (instance? ObjectId arg1) (long? arg2) (long? arg3))
+        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3))
         (.setUint transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3))
         :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
 nil
@@ -362,7 +357,7 @@ nil
   ([^Transaction transaction arg1 arg2]
   (cond (and (instance? ObjectId arg1) (instance? String arg2))
         (.setNull transaction ^ObjectId arg1 ^String arg2)
-        (and (instance? ObjectId arg1) (long? arg2))
+        (and (instance? ObjectId arg1) (integer? arg2))
         (.setNull transaction ^ObjectId arg1 ^Long (long arg2))
         :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2})))))
 nil

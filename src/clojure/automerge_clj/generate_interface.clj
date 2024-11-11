@@ -111,7 +111,7 @@
 (defn clj-type-predicate [type-spec]
   (case type-spec
     int 'integer?
-    long 'long?
+    long 'integer?
     double 'double?
     boolean 'boolean?
     false))
@@ -224,6 +224,11 @@
            (map (fn [[jfn exp]]
                   (generate-functions java-name [jfn exp])))))))
 
+;; (defn long? [x]
+;;   (and (integer? x)
+;;        (or (> x Integer/MAX_VALUE)
+;;            (< x Integer/MIN_VALUE))))
+
 (defonce special-case-functions 
   "(defonce +object-type-map+ ObjectType/MAP)
 (defonce +object-type-list+ ObjectType/LIST)
@@ -234,12 +239,7 @@
 (defonce +expand-mark-both+ ExpandMark/BOTH)
 (defonce +expand-mark-none+ ExpandMark/NONE)
 
-(defn- long? [x]
-  (and (integer? x)
-       (or (> x Integer/MAX_VALUE)
-           (< x Integer/MIN_VALUE))))
-
-(defn- array-instance? [c o]
+(defn array-instance? [c o]
   (and (-> o class .isArray)
        (= (-> o class .getComponentType)
           c)))")
