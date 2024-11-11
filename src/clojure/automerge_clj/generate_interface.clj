@@ -93,12 +93,25 @@
   "Group methods by number of arguments"
   (group-by #(count (nth % 2)) methods))
 
-(def +clj->java-types+ {:int 'Integer :long 'Long :double 'Double :boolean 'Boolean})
+(defn- long? [x]
+  (and (integer? x)
+       (or (> x Integer/MAX_VALUE)
+           (< x Integer/MIN_VALUE))))
+
+(defn clj-type-predicate [type-spec]
+  (case type-spec
+    int 'integer?
+    long 'long?
+    double 'double?
+    boolean 'boolean?
+    false))
 
 (defn- type-check-expr [arg-num type-spec]
   (let [arg (symbol (str "arg" arg-num))]
     (cond (symbol? type-spec)
-          `(~'instance? ~(get +clj->java-types+ (keyword type-spec) type-spec) ~arg)
+          (if-let [predicate (clj-type-predicate type-spec)]
+            `(~predicate ~arg)
+            `(~'instance? ~type-spec ~arg))
 
           (and (vector? type-spec) (= :array-of (first type-spec)))
           (let [type (second type-spec)]
