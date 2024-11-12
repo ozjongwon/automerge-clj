@@ -115,7 +115,8 @@
       (b64/decode)))
 
 (defprotocol CRDT
-  (%crdt-get [this args]))
+  (%crdt-get [this args])
+  (%crdt-set [this tx pos-info value]))
 
 (defn- unwrap-crdt-optional [optional]
   (when-let [val (optional->nilable optional)]
@@ -123,6 +124,7 @@
 
 (defn- hydrate-crdt-value [am-value]
   ((condp = (type am-value)
+     String identity
      AmValue$UInt u-int-get-value
      AmValue$Int int-get-value
      AmValue$Bool bool-get-value
@@ -134,6 +136,27 @@
      AmValue$Unknown unknown-get-value)
    am-value))
 
+(defrecord CrdtMap [doc id]
+  CRDT
+  (%crdt-get [this index]
+    (document-get doc id index))
+  (%crdt-set [this tx index value]))
+
+(defrecord CrdtList [doc id]
+  CRDT
+  (%crdt-get [this index]
+    (document-get doc id index))
+  (%crdt-set [this tx index value]))
+
+(defrecord CrdtText [doc id]
+  CRDT
+  (%crdt-get [this ignore]
+    (document-text doc id))
+  (%crdt-set [this tx [start delete-count] value]
+    (if (string? value)
+      (transaction-splice-text tx id start delete-count value)
+      :fixme)))
+
 (defn- crdt-get
   ([^CrdtText crdt]
    (crdt-get crdt nil))
@@ -142,30 +165,25 @@
        unwrap-crdt-optional
        hydrate-crdt-value)))
 
+(defn- crdt-set [crdt tx pos val]
+  (%crdt-set crdt tx pos val))
+
 (defn- crdt-free [crdt]
   (document-free (:doc crdt))
   nil)
 
-(defrecord CrdtMap [doc id]
-  CRDT
-  (%crdt-get [this index]
-    (document-get doc id index)))
 
-(defrecord CrdtList [doc id]
-  CRDT
-  (%crdt-get [this index]
-    (document-get doc id index)))
-
-(defrecord CrdtText [doc id]
-  CRDT
-  (%crdt-get [this ignore]
-    (document-text doc id)))
-
-(defn- make-crdt-instance [doc am-value]
-  (condp =  (type am-value)
-    AmValue$Map (->CrdtMap doc (map-get-id am-value))
-    AmValue$List (->CrdtList doc (list-get-id am-value))
-    AmValue$Text (->CrdtText doc (text-get-id am-value))))
+(defn- make-crdt-instance
+  ([doc am-value]
+   (condp =  (type am-value)
+     AmValue$Map (->CrdtMap doc (map-get-id am-value))
+     AmValue$List (->CrdtList doc (list-get-id am-value))
+     AmValue$Text (->CrdtText doc (text-get-id am-value))))
+  ([doc k obj-id]
+   (case k
+     :map (->CrdtMap doc obj-id)
+     :list (->CrdtList doc obj-id)
+     :text (->CrdtText doc obj-id))))
 
 (defn hydrate-crdt-object [doc-b64-str name]
   (let [doc (-> (b64-str->decoded-bytes doc-b64-str)
@@ -175,6 +193,57 @@
                     (optional->nilable))]
     (when content
       (make-crdt-instance doc content))))
+
+(defn- key->object-type [k]
+  (var-get (resolve (symbol (str "+object-type-" (name k) "+")))))
+
+(defn add-crdt-data [doc-or-actor crdt-type crdt-key pos-info val]
+  (letfn [(%make-crdt-instance [obj]
+            (when obj
+              (make-crdt-instance doc obj)))]
+    (let [doc (cond (bytes? doc-or-actor) (make-document doc-or-actor) ;; actor
+                    (string? doc-or-actor) (-> (b64-str->decoded-bytes doc-or-actor)
+                                               (document-load)) ;; restor saved doc
+                    :else (make-document))
+          tx (document-start-transaction doc)]
+      (try (let [crdt-obj (if (string? doc-or-actor) ;; from saved doc
+                            (-> doc
+                                (document-get ObjectId/ROOT crdt-key)
+                                (optional->nilable)
+                                (%make-crdt-instance))
+                            (->> (key->object-type crdt-type)
+                                 (transaction-set tx
+                                                  ObjectId/ROOT
+                                                  crdt-key)
+                                 (make-crdt-instance doc crdt-type)))]
+             ;;             (transaction-set tx org.automerge.ObjectId/ROOT "list1" +object-type-list+)
+             (crdt-set crdt-obj tx pos-info val)
+             (transaction-commit tx)
+             (->> (document-save doc)
+                  (b64-encode-str)
+                  (assoc crdt-obj :doc)))
+           (finally (document-free doc))))))
+
+(defn get-crdt-data
+  ([doc-or-actor crdt-key] ;; text
+   (get-crdt doc-or-actor crdt-key nil))
+  ([doc-or-actor crdt-key pos-info]
+   (let [doc (cond (bytes? doc-or-actor) (make-document doc-or-actor) ;; actor
+                   (string? doc-or-actor) (-> (b64-str->decoded-bytes doc-or-actor)
+                                              (document-load)) ;; restor saved doc
+                   )
+         content (-> doc
+                     (document-get ObjectId/ROOT crdt-key)
+                     (optional->nilable))]
+     (when content
+       (-> (make-crdt-instance doc content)
+           (crdt-get pos-info))))))
+
+(def test (add-crdt :create :text "hello" [0 0] "world"))
+
+;; (-> (hydrate-crdt-object "hW9Kg6lCVgcApQEBEJkw82CPLkUasRhFQ/UmbK0BgEQFsLdg2T2UX0543xE+0nv1LroTZVP9O5y/M4PQaGgGAQIDAhMCIwJAAlYCCwEEAgQTBBUJIQIjAjQCQgNWBFccgAECfwB/AX8CfwB/AH8HAAF/AAABfwEAAX8AfwVsaXN0MQABAgACAQEBfgIBfgDGA0hvdyB0byBkZWFsIHdpdGggQ29uZmxpY3RzPz8CAAA="
+;;                          "list1")
+;;     (crdt-get 0))
 
 (comment
   (let [doc (make-document)
@@ -186,69 +255,6 @@
                (b64-encode-str)))
          (finally (document-free doc))))
 
-  (let [doc (-> (b64-str->decoded-bytes "hW9Kg6lCVgcApQEBEJkw82CPLkUasRhFQ/UmbK0BgEQFsLdg2T2UX0543xE+0nv1LroTZVP9O5y/M4PQaGgGAQIDAhMCIwJAAlYCCwEEAgQTBBUJIQIjAjQCQgNWBFccgAECfwB/AX8CfwB/AH8HAAF/AAABfwEAAX8AfwVsaXN0MQABAgACAQEBfgIBfgDGA0hvdyB0byBkZWFsIHdpdGggQ29uZmxpY3RzPz8CAAA=")
-                (document-load))
-        list (-> (document-get doc ObjectId/ROOT "list1")
-                 (optional->nilable)
-                 (list-get-id))]
-    (println "***>>>"
-             (->> (document-get-object-type doc  list)
-                  (optional->nilable))
-             ObjectType/LIST)
-    (-> (document-get doc list 0)
-        (optional->nilable)
-        (str-get-value)))
-
-  (let [doc (make-document)
-        tx (document-start-transaction doc)
-        new-doc (-> (try (let [list (transaction-set tx org.automerge.ObjectId/ROOT "list1" +object-type-list+)]
-                           (transaction-insert tx list 0 "How to deal with Conflicts??")
-                           (transaction-commit tx)
-
-                           (let [sd (document-save doc)
-                                 loid (->> (document-get doc ObjectId/ROOT "list1")
-                                           (optional->nilable)
-                                           (list-get-id))]
-                             (println "*** "  (-> (document-get doc loid 0)
-                                                  str))
-                             sd))
-                         (finally (document-free doc)))
-                    (document-load))
-        amval (-> (document-get new-doc ObjectId/ROOT "list1")
-                  (optional->nilable))]
-    [doc amval])
-
-  (let [doc (make-document)
-        tx (document-start-transaction doc)
-        new-doc (-> (try (let [list (transaction-set tx org.automerge.ObjectId/ROOT "list1" +object-type-list+)]
-                           (transaction-insert tx list 0 "How to deal with Conflicts??")
-                           (transaction-commit tx)
-                           (println "*** " (-> (document-get doc ObjectId/ROOT "list1")
-                                               (optional->nilable)))
-                           (document-save doc))
-                         (finally (document-free doc)))
-                    (document-load))
-        amval (-> (document-get new-doc ObjectId/ROOT "list1")
-                  (optional->nilable))]
-    [doc amval])
-
-  (def doc (first *1))
-  (def aml (second *2))
-  (document-get doc (list-get-id aml) 0)
-
-
-  (let [doc (make-document)
-        tx (document-start-transaction doc)
-        new-doc (-> (try (let [list (transaction-set tx org.automerge.ObjectId/ROOT "list1" +object-type-list+)]
-                           (transaction-insert tx list 0 "How to deal with Conflicts??")
-                           (transaction-commit tx)
-                           (document-save doc))
-                         (finally (document-free doc)))
-                    (document-load))
-        amval (-> (document-get new-doc ObjectId/ROOT "list1")
-                  (optional->nilable))]
-    [doc amval])
-
   (defn example-2 []
     (with-document-tx [doc tx]
       (let [todo-list-oid (transaction-set tx ObjectId/ROOT "todos" +object-type-list+)]
@@ -257,31 +263,31 @@
         (transaction-insert tx todo-list-oid 0 "Go cycling")
         (println "****" (document-get-heads doc)))))
 
-  (def saved (let [alice-doc (make-document)
-                   alice-tx (document-start-transaction alice-doc)
-                   todo-list (transaction-set alice-tx ObjectId/ROOT "todos" +object-type-list+)
-                   bob-doc (make-document)
-                   bob-tx (document-start-transaction bob-doc)]
-               (try (do
-                      (transaction-insert alice-tx todo-list 0 "Buy groceries")
-                      (transaction-insert alice-tx todo-list 0 "Call dentist")
-                      (transaction-commit alice-tx)
-                      (document-save alice-doc)))))
 
-  (example-2)
+  (defmacro with-document-crdt [[[doc & str-or-actor] crdt-type crdt-key pos-info value] & body]
+    `(let [~doc (cond (bytes? ~@str-or-actor) (make-document ~@str-or-actor) ;; actor
+                      (string? ~@str-or-actor) (-> (b64-str->decoded-bytes ~@str-or-actor)
+                                                   (document-load)) ;; restor saved doc
+                      :else (make-document))
+           tx# (document-start-transaction ~doc)
+           crdt-obj# (if (string? ~@str-or-actor) ;; from saved doc
+                       (-> ~doc
+                           (document-get ObjectId/ROOT ~crdt-key)
+                           (optional->nilable)
+                           #(when %
+                              (make-crdt-instance ~doc %)))
+                       (transaction-set tx# org.automerge.ObjectId/ROOT crdt-key
+                                        ~(symbol (str "+object-type-" (name crdt-type)))))
+           ]
+       ~@body))
+
+  (let [x "abc"]
+    (with-document-crdt [[doc x] :text "hello" [0 0] "world"]
+      1))
+  (with-document-tx [doc tx :commit? true :free? true]
+    (with-document-content [tx text :text "hello"]
 
 
-
-  (defn b64-str->decoded-bytes [str]
-    (-> (.getBytes str)
-        (b64/decode)))
-
-  (def saved-str (b64-encode-str saved))
-  (println (b64-str->decoded-bytes saved-str) saved)
-
-  (def bob-saved (let [bob-doc (document-load (b64-str->decoded-bytes saved-str))
-                       bob-tx (document-start-transaction bob-doc)]
-                   (document-get-heads bob-doc)))
-
-  (= (seq (b64-str->decoded-bytes saved-str)) (seq saved))
+      (splice tx text "Hello World")
+      (reset! doc1 (document-save doc))))
   )
