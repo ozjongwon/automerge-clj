@@ -198,14 +198,16 @@
   (var-get (resolve (symbol (str "+object-type-" (name k) "+")))))
 
 (defn add-crdt-data [doc-or-actor crdt-type crdt-key pos-info val]
-  (letfn [(%make-crdt-instance [obj]
-            (when obj
-              (make-crdt-instance doc obj)))]
-    (let [doc (cond (bytes? doc-or-actor) (make-document doc-or-actor) ;; actor
-                    (string? doc-or-actor) (-> (b64-str->decoded-bytes doc-or-actor)
-                                               (document-load)) ;; restor saved doc
-                    :else (make-document))
-          tx (document-start-transaction doc)]
+  (let [doc (cond (bytes? doc-or-actor) (make-document doc-or-actor) ;; actor
+                  (string? doc-or-actor) (-> (b64-str->decoded-bytes doc-or-actor)
+                                             (document-load)) ;; restor saved doc
+                  :else (make-document))
+        tx (document-start-transaction doc)]
+
+    (letfn [(%make-crdt-instance [obj]
+              (when obj
+                (make-crdt-instance doc obj)))]
+
       (try (let [crdt-obj (if (string? doc-or-actor) ;; from saved doc
                             (-> doc
                                 (document-get ObjectId/ROOT crdt-key)
@@ -226,26 +228,28 @@
 
 (defn get-crdt-data
   ([doc-or-actor crdt-key] ;; text
-   (get-crdt doc-or-actor crdt-key nil))
+   (get-crdt-data doc-or-actor crdt-key nil))
   ([doc-or-actor crdt-key pos-info]
    (let [doc (cond (bytes? doc-or-actor) (make-document doc-or-actor) ;; actor
                    (string? doc-or-actor) (-> (b64-str->decoded-bytes doc-or-actor)
                                               (document-load)) ;; restor saved doc
-                   )
-         content (-> doc
-                     (document-get ObjectId/ROOT crdt-key)
-                     (optional->nilable))]
-     (when content
-       (-> (make-crdt-instance doc content)
-           (crdt-get pos-info))))))
-
-(def test (add-crdt :create :text "hello" [0 0] "world"))
-
-;; (-> (hydrate-crdt-object "hW9Kg6lCVgcApQEBEJkw82CPLkUasRhFQ/UmbK0BgEQFsLdg2T2UX0543xE+0nv1LroTZVP9O5y/M4PQaGgGAQIDAhMCIwJAAlYCCwEEAgQTBBUJIQIjAjQCQgNWBFccgAECfwB/AX8CfwB/AH8HAAF/AAABfwEAAX8AfwVsaXN0MQABAgACAQEBfgIBfgDGA0hvdyB0byBkZWFsIHdpdGggQ29uZmxpY3RzPz8CAAA="
-;;                          "list1")
-;;     (crdt-get 0))
+                   )]
+     (try (when-let [content (-> doc
+                                 (document-get ObjectId/ROOT crdt-key)
+                                 (optional->nilable))]
+            (-> (make-crdt-instance doc content)
+                (crdt-get pos-info)))
+          (finally (document-free doc))))))
 
 (comment
+  (def test (add-crdt-data :create :text "hello" [0 0] "world"))
+  (get-crdt-data (:doc test) "hello")
+
+  (-> (hydrate-crdt-object "hW9Kg6lCVgcApQEBEJkw82CPLkUasRhFQ/UmbK0BgEQFsLdg2T2UX0543xE+0nv1LroTZVP9O5y/M4PQaGgGAQIDAhMCIwJAAlYCCwEEAgQTBBUJIQIjAjQCQgNWBFccgAECfwB/AX8CfwB/AH8HAAF/AAABfwEAAX8AfwVsaXN0MQABAgACAQEBfgIBfgDGA0hvdyB0byBkZWFsIHdpdGggQ29uZmxpY3RzPz8CAAA="
+                           "list1")
+      (crdt-get 0))
+
+
   (let [doc (make-document)
         tx (document-start-transaction doc)]
     (try (let [list (transaction-set tx org.automerge.ObjectId/ROOT "list1" +object-type-list+)]
