@@ -33,7 +33,7 @@ nil
 
 (defn ^Document document-fork
   ([^Document document]
-   ((.fork document)))
+   (.fork document))
   ([^Document document arg1]
   (cond (bytes? arg1)
         (.fork document ^bytes arg1)

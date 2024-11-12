@@ -139,14 +139,19 @@
         arg-names (map-indexed
                    (fn [idx [type name]]
                      [type (symbol (str "arg" (inc idx)))])
-                   args)]
-    `(~@(if (> (count conditions) 1)
-          `((~'and ~@conditions))
-          conditions)
-      ~(make-java-call-signature java-class
-                                 java-fn
-                                 `(~@(mapcat (fn [[type arg]] [(canonical-type type) arg]) arg-names))
-                                 opts))))
+                   args)
+        call-signature (make-java-call-signature java-class
+                                                 java-fn
+                                                 `(~@(mapcat (fn [[type arg]] [(canonical-type type) arg]) arg-names))
+                                                 opts)]
+    (case (count conditions)
+      0 call-signature
+      1 `(~@conditions ~call-signature)
+      `((~'and ~@conditions)
+        ~(make-java-call-signature java-class
+                                   java-fn
+                                   `(~@(mapcat (fn [[type arg]] [(canonical-type type) arg]) arg-names))
+                                   opts)))))
 
 (defn- make-arity-method [java-fn java-class methods arity opts]
   (let [arg-symbols (map #(symbol (str "arg" (inc %))) (range arity))
