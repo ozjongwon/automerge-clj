@@ -2,7 +2,10 @@
   (:use [clojure.automerge-clj.automerge-interface])
   (:require [clojure.java.io :as io]
             [clojure.data.codec.base64 :as b64])
-  (:import [org.automerge ObjectId]))
+  (:import [org.automerge ObjectId ObjectType
+            AmValue$UInt AmValue$Int AmValue$Bool AmValue$Bytes AmValue$Str
+            AmValue$F64 AmValue$Counter AmValue$Timestamp AmValue$Null AmValue$Unknown
+            AmValue$Map AmValue$List AmValue$Text]))
 
 (defmacro with-document-tx [[doc tx & {:keys [free? commit? actor]}] & body]
   `(let [~doc ~(if actor
@@ -103,18 +106,136 @@
     ;; (document-free @doc2)
     ))
 
+(defn b64-encode-str [byte-array]
+  (-> (b64/encode byte-array)
+      (String.)))
+
+(defn b64-str->decoded-bytes [str]
+  (-> (.getBytes str)
+      (b64/decode)))
+
+(defprotocol CRDT
+  (%crdt-get [this args]))
+
+(defn- unwrap-crdt-optional [optional]
+  (when-let [val (optional->nilable optional)]
+    val))
+
+(defn- hydrate-crdt-value [am-value]
+  ((condp = (type am-value)
+     AmValue$UInt u-int-get-value
+     AmValue$Int int-get-value
+     AmValue$Bool bool-get-value
+     AmValue$Bytes bytes-get-value
+     AmValue$Str str-get-value
+     AmValue$F64 f64-get-value
+     AmValue$Counter counter-get-value
+     AmValue$Timestamp timestamp-get-value
+     AmValue$Unknown unknown-get-value)
+   am-value))
+
+(defn- crdt-get
+  ([^CrdtText crdt]
+   (crdt-get crdt nil))
+  ([crdt index]
+   (-> (%crdt-get crdt index)
+       unwrap-crdt-optional
+       hydrate-crdt-value)))
+
+(defn- crdt-free [crdt]
+  (document-free (:doc crdt))
+  nil)
+
+(defrecord CrdtMap [doc id]
+  CRDT
+  (%crdt-get [this index]
+    (document-get doc id index)))
+
+(defrecord CrdtList [doc id]
+  CRDT
+  (%crdt-get [this index]
+    (document-get doc id index)))
+
+(defrecord CrdtText [doc id]
+  CRDT
+  (%crdt-get [this ignore]
+    (document-text doc id)))
+
+(defn- make-crdt-instance [doc am-value]
+  (condp =  (type am-value)
+    AmValue$Map (->CrdtMap doc (map-get-id am-value))
+    AmValue$List (->CrdtList doc (list-get-id am-value))
+    AmValue$Text (->CrdtText doc (text-get-id am-value))))
+
+(defn hydrate-crdt-object [doc-b64-str name]
+  (let [doc (-> (b64-str->decoded-bytes doc-b64-str)
+                (document-load))
+        content (-> doc
+                    (document-get ObjectId/ROOT name)
+                    (optional->nilable))]
+    (when content
+      (make-crdt-instance doc content))))
+
 (comment
+  (let [doc (make-document)
+        tx (document-start-transaction doc)]
+    (try (let [list (transaction-set tx org.automerge.ObjectId/ROOT "list1" +object-type-list+)]
+           (transaction-insert tx list 0 "How to deal with Conflicts??")
+           (transaction-commit tx)
+           (-> (document-save doc)
+               (b64-encode-str)))
+         (finally (document-free doc))))
+
+  (let [doc (-> (b64-str->decoded-bytes "hW9Kg6lCVgcApQEBEJkw82CPLkUasRhFQ/UmbK0BgEQFsLdg2T2UX0543xE+0nv1LroTZVP9O5y/M4PQaGgGAQIDAhMCIwJAAlYCCwEEAgQTBBUJIQIjAjQCQgNWBFccgAECfwB/AX8CfwB/AH8HAAF/AAABfwEAAX8AfwVsaXN0MQABAgACAQEBfgIBfgDGA0hvdyB0byBkZWFsIHdpdGggQ29uZmxpY3RzPz8CAAA=")
+                (document-load))
+        list (-> (document-get doc ObjectId/ROOT "list1")
+                 (optional->nilable)
+                 (list-get-id))]
+    (println "***>>>"
+             (->> (document-get-object-type doc  list)
+                  (optional->nilable))
+             ObjectType/LIST)
+    (-> (document-get doc list 0)
+        (optional->nilable)
+        (str-get-value)))
+
   (let [doc (make-document)
         tx (document-start-transaction doc)
         new-doc (-> (try (let [list (transaction-set tx org.automerge.ObjectId/ROOT "list1" +object-type-list+)]
                            (transaction-insert tx list 0 "How to deal with Conflicts??")
                            (transaction-commit tx)
+
+                           (let [sd (document-save doc)
+                                 loid (->> (document-get doc ObjectId/ROOT "list1")
+                                           (optional->nilable)
+                                           (list-get-id))]
+                             (println "*** "  (-> (document-get doc loid 0)
+                                                  str))
+                             sd))
+                         (finally (document-free doc)))
+                    (document-load))
+        amval (-> (document-get new-doc ObjectId/ROOT "list1")
+                  (optional->nilable))]
+    [doc amval])
+
+  (let [doc (make-document)
+        tx (document-start-transaction doc)
+        new-doc (-> (try (let [list (transaction-set tx org.automerge.ObjectId/ROOT "list1" +object-type-list+)]
+                           (transaction-insert tx list 0 "How to deal with Conflicts??")
+                           (transaction-commit tx)
+                           (println "*** " (-> (document-get doc ObjectId/ROOT "list1")
+                                               (optional->nilable)))
                            (document-save doc))
                          (finally (document-free doc)))
                     (document-load))
         amval (-> (document-get new-doc ObjectId/ROOT "list1")
                   (optional->nilable))]
     [doc amval])
+
+  (def doc (first *1))
+  (def aml (second *2))
+  (document-get doc (list-get-id aml) 0)
+
 
   (let [doc (make-document)
         tx (document-start-transaction doc)
@@ -149,9 +270,7 @@
 
   (example-2)
 
-  (defn b64-encode-str [byte-array]
-    (-> (b64/encode saved)
-        (String.)))
+
 
   (defn b64-str->decoded-bytes [str]
     (-> (.getBytes str)
