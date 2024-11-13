@@ -1,7 +1,7 @@
 (ns automerge-clj.core
-  (:use [clojure.automerge-clj.automerge-interface])
   (:require [clojure.java.io :as io]
-            [clojure.data.codec.base64 :as b64])
+            [clojure.data.codec.base64 :as b64]
+            [clojure.automerge-clj.automerge-interface :refer :all])
   (:import [org.automerge ObjectId ObjectType
             AmValue$UInt AmValue$Int AmValue$Bool AmValue$Bytes AmValue$Str
             AmValue$F64 AmValue$Counter AmValue$Timestamp AmValue$Null AmValue$Unknown
@@ -122,7 +122,7 @@
   (when-let [val (optional->nilable optional)]
     val))
 
-(defn- hydrate-crdt-value [am-value]
+(defn hydrate-crdt-value [am-value]
   ((condp = (type am-value)
      String identity
      AmValue$UInt u-int-get-value
@@ -213,7 +213,9 @@
                                 (document-get ObjectId/ROOT crdt-key)
                                 (optional->nilable)
                                 (%make-crdt-instance))
-                            (->> (key->object-type crdt-type)
+                            (->> (if (keyword? crdt-type)
+                                   (key->object-type crdt-type)
+                                   crdt-type)
                                  (transaction-set tx
                                                   ObjectId/ROOT
                                                   crdt-key)
