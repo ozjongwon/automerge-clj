@@ -4,19 +4,13 @@
    [clojure.java.shell :as sh]
    [clojure.pprint :as pp]
    [clojure.string :as str]
-   [clojure.set :as set])
-  (:import
-   (org.automerge ChangeHash Document ObjectId Mark)))
+   [clojure.set :as set]
+   [camel-snake-kebab.core :as csk]))
 
 (defonce ^:dynamic *fout* nil)
 
-(defn init-lib []
-  (let [doc (Document.)]   ;; Native lib init happens
-    ObjectId/ROOT          ;; Access lazy field
-    (.free doc)))
-
 (defn- simple-case? [defs]
-  (let [num-arg-list (map #(count (nth %  2)) defs)]
+  (let [num-arg-list (map #(count (nth % 4)) defs)]
     (or (empty? num-arg-list)
         (= (count num-arg-list)
            (count (dedupe num-arg-list))))))
@@ -65,8 +59,15 @@
           static? `(~(str java-class "/" java-fn) ~@new-args)
           :else `(~(str \. java-fn) ~(str/lower-case java-class) ~@new-args))))
 
-(defn- generate-a-function [java-fn java-class def]
-  (let [[fn-name return-type type+args & {:keys [static? constructor?] :as opts}] def
+(defn- java->clj-fname+main-arg [tclass class method]
+  (let [clj-fn (csk/->kebab-case method)]
+    (cond (= tclass class method) [(str "make-" clj-fn) tclass] ;; ctor
+          (= tclass class) [clj-fn tclass]
+          :else [clj-fn class])))
+
+(defn- generate-a-function [[tclass class java-fn return-type type+args &
+                             {:keys [static? constructor?] :as opts}]]
+  (let [[fn-name java-class] (java->clj-fname+main-arg tclass class java-fn)
         [types args] (split-type+args type+args)
         canonicalized-args (mapcat (fn [type arg]
                                      (list (canonical-type type) arg))
@@ -84,29 +85,49 @@
 ;;   document-generate-sync-message
 ;;   Optional
 ;;   ([SyncState sync-state]))
-(defn- generate-simple-multiple-arity-functions [java-fn java-class defs]
-  (assert (apply = (map second defs)) "Return type must be same")
-  (let [[fn-name return-type type+args & {:keys [static? constructor?] :as opts}] (first defs)]
+;; (defn- generate-simple-multiple-arity-functions [java-fn java-class defs]
+;;   (assert (apply = (map second defs)) "Return type must be same")
+;;   (let [[fn-name return-type type+args & {:keys [static? constructor?] :as opts}] (first defs)]
+;;     (pp/cl-format *fout* "~2&(defn ~{~A~} ~A~%~{~A~^~%~})~&"
+;;                   (when-let [result (canonical-type return-type)]
+;;                     result)
+;;                   fn-name
+;;                   (for [[_ _ type+args] defs
+;;                         :let [[types args] (split-type+args type+args)
+;;                               canonicalized-args (mapcat (fn [type arg]
+;;                                                            (list (canonical-type type) arg))
+;;                                                          types args)
+;;                               fn-args (take-nth 2 (rest canonicalized-args))]]
+;;                     (pp/cl-format nil "~2T([~{~A~^ ~}]~%~2T (~{~A~^ ~}))"
+;;                                   `(~@(make-main-instance-arg java-class opts)
+;;                                     ~@fn-args)
+;;                                   (make-java-call-signature java-class java-fn canonicalized-args opts))))))
+
+(defn- generate-simple-multiple-arity-functions [defs]
+  (assert (apply = (map #(nth % 3) defs)) "Return type must be same")
+  (let [[tclass class java-fn return-type type+args & {:keys [static? constructor?] :as opts}] (first defs)
+        [fn-name java-class] (java->clj-fname+main-arg tclass class java-fn)]
     (pp/cl-format *fout* "~2&(defn ~{~A~} ~A~%~{~A~^~%~})~&"
                   (when-let [result (canonical-type return-type)]
                     result)
                   fn-name
-                  (for [[_ _ type+args] defs
-                        :let [[types args] (split-type+args type+args)
-                              canonicalized-args (mapcat (fn [type arg]
-                                                           (list (canonical-type type) arg))
-                                                         types args)
-                              fn-args (take-nth 2 (rest canonicalized-args))]]
-                    (pp/cl-format nil "~2T([~{~A~^ ~}]~%~2T (~{~A~^ ~}))"
-                                  `(~@(make-main-instance-arg java-class opts)
-                                    ~@fn-args)
-                                  (make-java-call-signature java-class java-fn canonicalized-args opts))))))
+                  (run! (fn [[_ _ _ _ type+args]]
+                          (let [[types args] (split-type+args type+args)
+                                canonicalized-args (mapcat (fn [type arg]
+                                                             (list (canonical-type type) arg))
+                                                           types args)
+                                fn-args (take-nth 2 (rest canonicalized-args))]
+                            (pp/cl-format nil "~2T([~{~A~^ ~}]~%~2T (~{~A~^ ~}))"
+                                          `(~@(make-main-instance-arg java-class opts)
+                                            ~@fn-args)
+                                          (make-java-call-signature java-class java-fn canonicalized-args opts))))
+                        defs))))
 ;;;
 ;;; Multiple arity case
 ;;;
 (defn- group-by-arity [methods]
   "Group methods by number of arguments"
-  (group-by #(count (nth % 2)) methods))
+  (group-by #(count (nth % 4)) methods))
 
 (defn clj-type-predicate [type-spec]
   (case type-spec
@@ -131,7 +152,7 @@
 
           :else (throw (ex-info "Uknown type-spec" {:type-spec type-spec})))))
 
-(defn- make-cond-clause [java-class java-fn obj [mname mreturn-type args opts]]
+(defn- make-cond-clause [java-class java-fn obj [tclass class fname mreturn-type args & opts]]
   (let [conditions (map-indexed
                     (fn [idx [type _]]
                       (type-check-expr (inc idx) type))
@@ -165,69 +186,66 @@
                                                                                         (range arity))
                                                                                    arg-symbols)))))
 
-(defn- generate-complex-multiple-arity-functions [java-fn java-class defs]
-  (let [all-return-types (->> (map second defs) (filter identity))
-        return-type (when-not (or (empty? all-return-types)
-                                  (apply not= all-return-types))
-                      (first all-return-types))]
-    (let [[fn-name _ type+args & opts] (first defs)
-          grouped (group-by-arity defs)
-          arity-methods (map (fn [[arity methods]]
-                               (make-arity-method java-fn java-class methods arity opts))
-                             grouped)]
-      (pp/cl-format *fout* "~2&(defn ~{~A~} ~A~%~{~2T(~A)~^~%~})~&"
-                    (when-let [result (canonical-type return-type)]
-                      result)
-                    fn-name
-                    arity-methods))))
+(defn- generate-complex-multiple-arity-functions [defs]
+  (let [[tclass class java-fn return-type _ & opts] (first defs)
+        [fn-name java-class] (java->clj-fname+main-arg tclass class java-fn)
+        grouped (group-by-arity defs)
+        arity-methods (map (fn [[arity methods]]
+                             (make-arity-method java-fn java-class methods arity opts))
+                           grouped)]
+    (pp/cl-format *fout* "~2&(defn ~{~A~} ~A~%~{~2T(~A)~^~%~})~&"
+                  (when-let [result (canonical-type return-type)]
+                    result)
+                  fn-name
+                  arity-methods)))
 
-(defn- generate-multy-arity-functions [java-fn java-class defs]
+(defn- generate-multy-arity-functions [defs]
   (cond (= (count defs) (->> defs (map first) dedupe count))
-        (run! #(generate-a-function java-fn java-class %) defs)
+        (run! #(generate-a-function %) defs)
 
-        (simple-case? defs) (generate-simple-multiple-arity-functions java-fn java-class defs)
+        (simple-case? defs) (generate-simple-multiple-arity-functions defs)
 
-        :else (generate-complex-multiple-arity-functions java-fn java-class  defs)))
+        :else (generate-complex-multiple-arity-functions defs)))
 
 (def +unusable-classes+ #{'Counter})
 
 (defn remove-unusable-methods [defs]
-  (filter (fn [[_ _ params & _]]
+  (filter (fn [[_ _ _ _ params & _]]
             (-> (map first params)
                 (set)
                 (set/intersection  +unusable-classes+)
                 (empty?)))
           defs))
 
-(defn generate-functions [java-class [java-fn clj-defs]]
+(defn generate-functions [clj-defs]
   (let [filtered-defs (remove-unusable-methods clj-defs)]
     (if (= (count clj-defs) 1)
-      (generate-a-function java-fn java-class (first filtered-defs))
-      (generate-multy-arity-functions java-fn java-class filtered-defs))))
+      (generate-a-function (first filtered-defs))
+      (generate-multy-arity-functions filtered-defs))))
 
 (defn generate-clojure-interface [filename]
   "Reads the file, processes each line, and returns a map of function names to their Clojure definitions."
   (with-open [reader (clojure.java.io/reader filename)]  ; Open the file for reading
     (let [reader (java.io.PushbackReader. reader)
-          [k arrow java-name] (list  (read reader false :eof) (read reader false :eof) (read reader false :eof))]
+          [k arrow tclass] (list  (read reader false :eof) (read reader false :eof) (read reader false :eof))]
 
-      (assert (and (= :java-name k) (= '=> arrow) (symbol? java-name)) "File format must be valid")
+      (assert (and (= :java-name k) (= '=> arrow) (symbol? tclass)) "File format must be valid")
 
       (->> (loop [result {}]
-             (let [java-name (read reader false :eof)
+             (let [class (read reader false :eof)
                    arrow (read reader false :eof)
-                   clj-name-return-args (read reader false :eof)]
-               (when-not (= :eof java-name)
-                 (assert (and (symbol? java-name) (= '=> arrow) (list? clj-name-return-args))
+                   class-fn-return-args (read reader false :eof)]
+               (when-not (= :eof class)
+                 (assert (and (symbol? class) (= '=> arrow) (list? class-fn-return-args))
                          "Entry format must be valid"))
-               (if (= :eof java-name)
+               (if (= :eof class)
                  result
                  (recur (update result
-                                java-name
+                                (second class-fn-return-args) ;; fn is the key
                                 (fnil conj [])
-                                clj-name-return-args)))))
-           (map (fn [[jfn exp]]
-                  (generate-functions java-name [jfn exp])))))))
+                                (cons tclass class-fn-return-args))))))
+           (map (fn [[fname tclass-class-fn-return-args]]
+                  (generate-functions tclass-class-fn-return-args)))))))
 
 ;; (defn long? [x]
 ;;   (and (integer? x)
@@ -258,28 +276,113 @@
                   classes-to-import
                   special-case-functions)))
 
-(defn java->clojure-interface-file [java-files clj-file]
-  (let [file (io/file clj-file)]
-    (when (.exists file)
-      (io/delete-file file)))
-  (with-open [out (io/writer clj-file :append true)]
-    (binding [*fout* out]
-      (interface-header (map (fn [f]
-                               (-> (str/split f #"\/")
+#_(defn java->clojure-interface-file [java-files clj-file]
+    (let [file (io/file clj-file)]
+      (when (.exists file)
+        (io/delete-file file)))
+    (with-open [out (io/writer clj-file :append true)]
+      (binding [*fout* out]
+        (interface-header (map (fn [f]
+                                 (-> (str/split f #"\/")
+                                     last
+                                     (str/split #"\.")
+                                     first))
+                               java-files))
+        (doseq [java-file java-files
+                :let [[name _] (-> (str/split java-file #"\/")
                                    last
-                                   (str/split #"\.")
-                                   first))
-                             java-files))
-      (doseq [java-file java-files
-              :let [[name _] (-> (str/split java-file #"\/")
-                                 last
-                                 (str/split #"\."))
-                    jv-clj-name (str name ".clj")]]
-        (sh/sh "bash" "-c" (str "cd src/python && source python-env/bin/activate && python3 parse-java.py " java-file))
-        (pp/cl-format *fout* "~&;;; Class ~A~2&" name)
-        (doseq [l (generate-clojure-interface (str "/tmp/" jv-clj-name))]
-          (binding [*out* *fout*]
-            (println l)))))))
+                                   (str/split #"\."))
+                      jv-clj-name (str name ".clj")]]
+          (sh/sh "bash" "-c" (str "cd src/python && source python-env/bin/activate && python3 parse-java.py " java-file))
+          (pp/cl-format *fout* "~&;;; Class ~A~2&" name)
+          (doseq [l (generate-clojure-interface (str "/tmp/" jv-clj-name))]
+            (binding [*out* *fout*]
+              (println l)))))))
+
+(defn generate-clojure-interface [filename]
+  "Reads the file, processes each line, and returns a map of function names to their Clojure definitions."
+  (with-open [reader (clojure.java.io/reader filename)]  ; Open the file for reading
+    (let [reader (java.io.PushbackReader. reader)
+          [k arrow tclass] (list  (read reader false :eof) (read reader false :eof) (read reader false :eof))]
+
+      (assert (and (= :java-name k) (= '=> arrow) (symbol? tclass)) "File format must be valid")
+
+      (->> (loop [result {}]
+             (let [class (read reader false :eof)
+                   arrow (read reader false :eof)
+                   class-fn-return-args (read reader false :eof)]
+               (when-not (= :eof class)
+                 (assert (and (symbol? class) (= '=> arrow) (list? class-fn-return-args))
+                         "Entry format must be valid"))
+               (if (= :eof class)
+                 result
+                 (recur (update result
+                                (second class-fn-return-args) ;; fn is the key
+                                (fnil conj [])
+                                (cons tclass class-fn-return-args))))))
+           (map (fn [[fname tclass-class-fn-return-args]]
+                  (generate-functions tclass-class-fn-return-args)))))))
+
+;; clj-fn-entry method tclass class clj-fn return args opts
+(defn- clj-fn-entry [method tclass class clj-fn return args {:keys [static? constructor?]}]
+  ;; constructor
+  ;; {:return return :fn clj-fn :fn-args fn-args :method method :method-args m-args}
+  (let [fn-args (map second args)]
+    {:return return
+     :fn clj-fn
+     :fn-args (if (or constructor? static?)
+                fn-args
+                (cons (csk/->kebab-case-string tclass) fn-args))
+     :method (if static?
+               (str (csk/->kebab-case-string class) "/" method)
+               method)
+     :method-args (if (or constructor? static?)
+                    args
+                    (cons [class (csk/->kebab-case-string tclass)] args))}))
+
+(defn def-file->build-fn-def-map [files]
+  (loop [[f & more-f] files
+         result {}]
+    (if f
+      (recur more-f
+             (into result
+                   (with-open [reader (clojure.java.io/reader f)] ; Open the file for reading
+                     (let [reader (java.io.PushbackReader. reader)]
+                       (let [[k arrow tclass] (list  (read reader false :eof) (read reader false :eof) (read reader false :eof))]
+                         (assert (and (= :java-name k) (= '=> arrow) (symbol? tclass)) "File format must be valid")
+                         (loop [method (read reader false :eof)
+                                arrow (read reader false :eof)
+                                class-cljfn-return-args-opts (read reader false :eof)
+                                result {}]
+                           (if (= :eof method)
+                             result
+                             (let [[class clj-fn return args & opts] class-cljfn-return-args-opts]
+                               (assert (and (symbol? method) (= '=> arrow) tclass class clj-fn)
+                                       "Entry format must be valid")
+                               (->> opts
+                                    (clj-fn-entry method tclass class clj-fn return args)
+                                    (update result
+                                            clj-fn
+                                            (fnil conj []))
+                                    (recur (read reader false :eof)
+                                           (read reader false :eof)
+                                           (read reader false :eof)))))))))))
+      result)))
+
+(defn java->clojure-interface-file [java-files clj-file]
+  (run! #(sh/sh "bash" "-c" (str "cd src/python && source python-env/bin/activate && python3 parse-java.py " %))
+        java-files)
+  (let [clj-files (map #(let [fname (-> (str/split % #"\/")
+                                        last
+                                        (str/split #"\.")
+                                        first)]
+                          (str "/tmp/" fname ".clj"))
+                       java-files)]
+    (->>  clj-files
+          def-file->build-fn-def-map
+          ;; def-map->clj-def-str-list
+          ;; def-str-list->file
+          )))
 
 (comment
   (defn array-instance? [c o]
@@ -288,7 +391,7 @@
             c)))
 
   (let [arr (make-array ChangeHash 5)]
-    (array-instance? ChangeHash arr))
+    (array-instance? ChangeHasharr))
 
   (java->clojure-interface-file ["~/Work/automerge-java/lib/src/main/java/org/automerge/Document.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/Transaction.java"

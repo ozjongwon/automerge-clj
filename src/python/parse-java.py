@@ -67,7 +67,7 @@ def parse_java_file(java_filename: str) -> Optional[Tuple[str, dict[str, List[Tu
                             param_type = format_type(param.type)
                             param_name = pascal_to_kebab(param.name)
                             params.append((param_type, param_name))
-                        methods[type_name] = methods.get(type_name, []) + [['constructor', params]]
+                        methods[type_name] = methods.get(type_name, []) + [['constructor', type_name, params]]
 
             # Process methods for both classes and interfaces
             for method in node.methods:
@@ -84,7 +84,7 @@ def parse_java_file(java_filename: str) -> Optional[Tuple[str, dict[str, List[Tu
                     static_p = 'true' if 'static' in method.modifiers else 'false'
                     inner_class = None if static_p == 'true' else inner_class
 
-                    methods[method_name] = methods.get(method_name, []) + [['method', params, return_type,
+                    methods[method_name] = methods.get(method_name, []) + [['method', type_name, params, return_type,
                                                                             outer_class, inner_class, static_p]]
         return (outer_class, methods)
 
@@ -105,20 +105,20 @@ def format_clojure_list(type_info: Tuple[str, dict]) -> str:
     lines.append(f"\n:java-name => {type_name}\n")
 
     for original_name, mdefs in methods.items():
-        for kind, params, *method_only in mdefs:
+        for kind, class_name, params, *method_only in mdefs:
             if method_only:
                 return_type, outer_class, inner_class, static_p = method_only
                 param_str = ' '.join(f"[{param_type} {param_name}]" for param_type, param_name in params)
-                formatted_name = f"{pascal_to_kebab(outer_class)}-{pascal_to_kebab(original_name)}" if inner_class == None else f"{pascal_to_kebab(inner_class)}-{pascal_to_kebab(original_name)}"
+                formatted_name = f"{pascal_to_kebab(outer_class)}-" + f"{pascal_to_kebab(original_name)}" if inner_class == None else f"{pascal_to_kebab(original_name)}"
                 # Add the original name and formatted definition
-                lines.append(f"{original_name} => ({formatted_name} {return_type} ({param_str}) :static? {static_p})")
+                lines.append(f"{original_name} => ({class_name} {formatted_name} {return_type} ({param_str}) :static? {static_p})")
             else:
                 # Format constructor
                 param_str = ' '.join(f"[{param_type} {param_name}]" for param_type, param_name in params)
-                constructor_name = f"make-{pascal_to_kebab(type_name)}"
+                constructor_name = f"{type_name}"
 
                 # Add the original name and formatted definition
-                lines.append(f"{type_name} => ({constructor_name} {type_name} ({param_str}) :constructor? true)")
+                lines.append(f"{type_name} => ({class_name} make-{pascal_to_kebab(constructor_name)} {type_name} ({param_str}) :constructor? true)")
 
     return '\n'.join(lines)
 
