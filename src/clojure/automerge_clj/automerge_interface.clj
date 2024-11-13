@@ -3,9 +3,9 @@
 ;;;
 
 (ns clojure.automerge-clj.automerge-interface
-        (:import [java.util Optional List HashMap Date Iterator]
+        (:import [java.util Optional List HashMap Date Iterator ArrayList]
                  [org.automerge ObjectId ObjectType ExpandMark
-Document Transaction ChangeHash Cursor PatchLog SyncState NewValue AmValue ObjectId]))
+Document Transaction ChangeHash Cursor PatchLog SyncState NewValue AmValue ObjectId Patch PatchAction Mark Prop]))
 
 (defonce +object-type-map+ ObjectType/MAP)
 (defonce +object-type-list+ ObjectType/LIST)
@@ -564,4 +564,134 @@ nil
 
 (defn ^Boolean object-id-equals [^ObjectId objectid obj]
   (.equals objectid ^Object obj))
+nil
+;;; Class Patch
+
+
+(defn ^ObjectId patch-get-obj [^Patch patch]
+  (.getObj patch))
+nil
+
+(defn ^ArrayList patch-get-path [^Patch patch]
+  (.getPath patch))
+nil
+
+(defn ^PatchAction patch-get-action [^Patch patch]
+  (.getAction patch))
+nil
+;;; Class PatchAction
+
+
+(defn ^Long delete-list-get-length [^PatchAction patchaction]
+  (.getLength patchaction))
+nil
+
+(defn ^String splice-text-get-text [^PatchAction patchaction]
+  (.getText patchaction))
+nil
+
+(defn ^String put-map-get-key [^PatchAction patchaction]
+  (.getKey patchaction))
+
+(defn ^String delete-map-get-key [^PatchAction patchaction]
+  (.getKey patchaction))
+nil
+
+(defn ^AmValue put-map-get-value [^PatchAction patchaction]
+  (.getValue patchaction))
+
+(defn ^AmValue put-list-get-value [^PatchAction patchaction]
+  (.getValue patchaction))
+
+(defn ^Long increment-get-value [^PatchAction patchaction]
+  (.getValue patchaction))
+nil
+
+(defn ^Boolean put-map-is-conflict [^PatchAction patchaction]
+  (.isConflict patchaction))
+
+(defn ^Boolean put-list-is-conflict [^PatchAction patchaction]
+  (.isConflict patchaction))
+nil
+
+(defn ^Prop increment-get-property [^PatchAction patchaction]
+  (.getProperty patchaction))
+
+(defn ^Prop flag-conflict-get-property [^PatchAction patchaction]
+  (.getProperty patchaction))
+nil
+
+(defn ^Long put-list-get-index [^PatchAction patchaction]
+  (.getIndex patchaction))
+
+(defn ^Long insert-get-index [^PatchAction patchaction]
+  (.getIndex patchaction))
+
+(defn ^Long splice-text-get-index [^PatchAction patchaction]
+  (.getIndex patchaction))
+
+(defn ^Long delete-list-get-index [^PatchAction patchaction]
+  (.getIndex patchaction))
+nil
+
+(defn ^"[[[Lorg.automerge.Mark;" mark-get-marks [^PatchAction patchaction]
+  (.getMarks patchaction))
+nil
+
+(defn ^ArrayList insert-get-values [^PatchAction patchaction]
+  (.getValues patchaction))
+nil
+;;; Class Mark
+
+
+(defn ^Long mark-get-start [^Mark mark]
+  (.getStart mark))
+nil
+
+(defn ^Long mark-get-end [^Mark mark]
+  (.getEnd mark))
+nil
+
+(defn ^String mark-get-name [^Mark mark]
+  (.getName mark))
+nil
+
+(defn ^AmValue mark-get-value [^Mark mark]
+  (.getValue mark))
+nil
+
+(defn ^String mark-to-string [^Mark mark]
+  (.toString mark))
+nil
+;;; Class Prop
+
+
+(defn ^Prop make-prop
+  ([^Prop prop arg1]
+  (cond (instance? String arg1)
+        (.Prop prop ^String arg1)
+        (integer? arg1)
+        (.Prop prop ^Long (long arg1))
+        :else (throw (ex-info "Type error" {:arg1 arg1})))))
+nil
+
+(defn ^String key-get-value [^Prop prop]
+  (.getValue prop))
+
+(defn ^Long index-get-value [^Prop prop]
+  (.getValue prop))
+nil
+
+(defn ^Integer key-hash-code [^Prop prop]
+  (.hashCode prop))
+
+(defn ^Integer index-hash-code [^Prop prop]
+  (.hashCode prop))
+nil
+
+(defn ^Boolean key-equals [^Prop prop obj]
+  (.equals prop ^Object obj))
+
+(defn ^Boolean index-equals [^Prop prop obj]
+  (.equals prop ^Object obj))
 nil

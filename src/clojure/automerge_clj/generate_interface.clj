@@ -6,7 +6,7 @@
    [clojure.string :as str]
    [clojure.set :as set])
   (:import
-   (org.automerge ChangeHash Document ObjectId)))
+   (org.automerge ChangeHash Document ObjectId Mark)))
 
 (defonce ^:dynamic *fout* nil)
 
@@ -253,7 +253,7 @@
   (binding [*out* *fout*]
     (println ";;;\n;;; Generated file, do not edit\n;;;\n")
     (pp/cl-format *fout* "(ns clojure.automerge-clj.automerge-interface
-        (:import [java.util Optional List HashMap Date Iterator]
+        (:import [java.util Optional List HashMap Date Iterator ArrayList]
                  [org.automerge ObjectId ObjectType ExpandMark~%~{~A~^ ~}]))~2&~A~2&"
                   classes-to-import
                   special-case-functions)))
@@ -301,7 +301,10 @@
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/NewValue.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/AmValue.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/ObjectId.java"
-                                 ;; "~/Work/automerge-java/lib/src/main/java/org/automerge/CommitResult.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/Patch.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/PatchAction.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/Mark.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/Prop.java"
 
 
                                  ;; "~/Work/automerge-java/lib/src/main/java/org/automerge/ObjectType.java"

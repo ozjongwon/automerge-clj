@@ -14,6 +14,12 @@ def pascal_to_kebab(name: str) -> str:
     s2 = re.sub('([a-z0-9])([A-Z])', r'\1-\2', s1)
     return s2.lower()
 
+def find_type(ref_type) -> str:
+    if ref_type.sub_type is None:
+        return ref_type.name
+    else:
+        return find_type(ref_type.sub_type)
+
 def format_type(java_type) -> str:
     """
     Format Java type into Clojure type notation, handling arrays.
@@ -21,7 +27,7 @@ def format_type(java_type) -> str:
     if isinstance(java_type, javalang.tree.BasicType):
         base_type = java_type.name
     else:
-        base_type = java_type.name
+        base_type = find_type(java_type)
 
     # Check if it's an array type
     if hasattr(java_type, 'dimensions') and java_type.dimensions:
