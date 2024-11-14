@@ -8,7 +8,14 @@
    [camel-snake-kebab.core :as csk])
   (:import [java.util Optional List HashMap Date Iterator ArrayList]
            [org.automerge ObjectId ObjectType ExpandMark Conflicts
-            Document Transaction ChangeHash Cursor PatchLog SyncState NewValue AmValue ObjectId Patch PatchAction Mark Prop]))
+            Document Transaction ChangeHash Cursor PatchLog SyncState NewValue
+            AmValue ObjectId Patch PatchAction Mark Prop Prop$Key Prop$Index
+            PatchAction$PutMap PatchAction$PutList PatchAction$Increment PatchAction$FlagConflict
+            PatchAction$Mark
+            PatchAction$PutList PatchAction$Insert PatchAction$SpliceText PatchAction$DeleteList
+            AmValue$Map AmValue$List AmValue$Text AmValue$UInt AmValue$Int AmValue$Bool AmValue$Bytes
+            AmValue$Str AmValue$F64 AmValue$Counter AmValue$Timestamp AmValue$Null AmValue$Unknown
+            Counter]))
 
 (defonce ^:dynamic *fout* nil)
 
@@ -83,28 +90,6 @@
                   `(~@(make-main-instance-arg java-class opts)
                     ~@fn-args)
                   (make-java-call-signature java-class java-fn canonicalized-args opts))))
-
-;; (clojure.core/defn
-;;   document-generate-sync-message
-;;   Optional
-;;   ([SyncState sync-state]))
-;; (defn- generate-simple-multiple-arity-functions [java-fn java-class defs]
-;;   (assert (apply = (map second defs)) "Return type must be same")
-;;   (let [[fn-name return-type type+args & {:keys [static? constructor?] :as opts}] (first defs)]
-;;     (pp/cl-format *fout* "~2&(defn ~{~A~} ~A~%~{~A~^~%~})~&"
-;;                   (when-let [result (canonical-type return-type)]
-;;                     result)
-;;                   fn-name
-;;                   (for [[_ _ type+args] defs
-;;                         :let [[types args] (split-type+args type+args)
-;;                               canonicalized-args (mapcat (fn [type arg]
-;;                                                            (list (canonical-type type) arg))
-;;                                                          types args)
-;;                               fn-args (take-nth 2 (rest canonicalized-args))]]
-;;                     (pp/cl-format nil "~2T([~{~A~^ ~}]~%~2T (~{~A~^ ~}))"
-;;                                   `(~@(make-main-instance-arg java-class opts)
-;;                                     ~@fn-args)
-;;                                   (make-java-call-signature java-class java-fn canonicalized-args opts))))))
 
 (defn- generate-simple-multiple-arity-functions [defs]
   (assert (apply = (map #(nth % 3) defs)) "Return type must be same")
@@ -289,29 +274,6 @@
                   classes-to-import
                   special-case-functions)))
 
-#_(defn java->clojure-interface-file [java-files clj-file]
-    (let [file (io/file clj-file)]
-      (when (.exists file)
-        (io/delete-file file)))
-    (with-open [out (io/writer clj-file :append true)]
-      (binding [*fout* out]
-        (interface-header (map (fn [f]
-                                 (-> (str/split f #"\/")
-                                     last
-                                     (str/split #"\.")
-                                     first))
-                               java-files))
-        (doseq [java-file java-files
-                :let [[name _] (-> (str/split java-file #"\/")
-                                   last
-                                   (str/split #"\."))
-                      jv-clj-name (str name ".clj")]]
-          (sh/sh "bash" "-c" (str "cd src/python && source python-env/bin/activate && python3 parse-java.py " java-file))
-          (pp/cl-format *fout* "~&;;; Class ~A~2&" name)
-          (doseq [l (generate-clojure-interface (str "/tmp/" jv-clj-name))]
-            (binding [*out* *fout*]
-              (println l)))))))
-
 (defn generate-clojure-interface [filename]
   "Reads the file, processes each line, and returns a map of function names to their Clojure definitions."
   (with-open [reader (clojure.java.io/reader filename)]  ; Open the file for reading
@@ -422,21 +384,36 @@
       type-check-exps
       (pp/cl-format nil "(and ~{~A~^ ~})" type-check-exps))))
 
+(defn args->type-hint-exps [args]
+  (map (fn [[type arg]]
+         (if (contains? #{"int" "long" "float" "double" "short" "boolean" "char"}
+                        type)
+           (format "(%s %s)" type arg)
+           (format "^%s %s" type arg)))
+       args))
+
 (defn make-fn-body [mv]
   (letfn [(call-exp [{:keys [return method method-args constructor? static?]}]
-            (let [method-type-pos (cond constructor? 0
+            (let [type-hint-args (args->type-hint-exps method-args)
+                  method-type-pos (cond constructor? 0
                                         static? 1
                                         :else 2)]
+              (pp/cl-format nil "~%~3T^~:[void~;~:*~A~] (~[~A.~;~A~;.~A~] ~{~A ~^~})" 
+                            return
+                            method-type-pos
+                            method
+                            type-hint-args)
+              #_
               (if return
                 (pp/cl-format nil "~%~3T^~A (~[~A.~;~A~;.~A~] ~{~A ~^~})" 
                               return
                               method-type-pos
                               method
-                              method-args)
-                (pp/cl-format nil "~%~3T (~:[.~A~;~A.~;.~A~] ~{~A ~^~})" 
+                              type-hint-args)
+                (pp/cl-format nil "~%~3T^void (~:[~A.~;~A~;.~A~] ~{~A ~^~})" 
                               method-type-pos
                               method
-                              method-args))))]
+                              type-hint-args))))]
     (if (= (count mv) 1)
       (call-exp (first mv))
       (map (fn [{:keys [return method method-args] :as def}]
