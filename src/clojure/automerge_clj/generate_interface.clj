@@ -52,6 +52,15 @@
      :constructor? constructor?
      :static? static?}))
 
+(defonce +unusable-classes+ #{'Counter})
+
+(defn has-unusable-args? [method-args]
+  (-> (map first method-args)
+      (set)
+      (set/intersection +unusable-classes+)
+      (empty?)
+      (not)))
+
 (defn def-file->build-fn-def-map [files]
   (loop [[f & more-f] files def-map {} all-classes []]
     (if f
@@ -70,14 +79,19 @@
                       (let [[class clj-fn return args & opts] class-cljfn-return-args-opts]
                         (assert (and (symbol? method) (= '=> arrow) tclass class clj-fn)
                                 "Entry format must be valid")
-                        (->> opts
-                             (clj-fn-entry method tclass class clj-fn return args)
-                             (update result
-                                     clj-fn
-                                     (fnil conj []))
-                             (recur (read reader false :eof)
-                                    (read reader false :eof)
-                                    (read reader false :eof)))))))))]
+                        (if (has-unusable-args? args)
+                          (recur (read reader false :eof)
+                                 (read reader false :eof)
+                                 (read reader false :eof)
+                                 result)
+                          (->> opts
+                               (clj-fn-entry method tclass class clj-fn return args)
+                               (update result
+                                       clj-fn
+                                       (fnil conj []))
+                               (recur (read reader false :eof)
+                                      (read reader false :eof)
+                                      (read reader false :eof))))))))))]
         (recur more-f (into def-map defs-map) (conj all-classes classes)))
       [all-classes def-map])))
 
