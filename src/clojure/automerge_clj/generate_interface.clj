@@ -9,7 +9,6 @@
   (:import [org.automerge ChangeHash ;; To generate type hint for the array of ChangeHash
             ]))
 
-
 (defonce special-case-functions 
   "(defonce +object-type-map+ ObjectType/MAP)
 (defonce +object-type-list+ ObjectType/LIST)
@@ -117,18 +116,7 @@
                             return
                             method-type-pos
                             method
-                            type-hint-args)
-              #_
-              (if return
-                (pp/cl-format nil "~%~3T^~A (~[~A.~;~A~;.~A~] ~{~A ~^~})" 
-                              return
-                              method-type-pos
-                              method
-                              type-hint-args)
-                (pp/cl-format nil "~%~3T^void (~:[~A.~;~A~;.~A~] ~{~A ~^~})" 
-                              method-type-pos
-                              method
-                              type-hint-args))))]
+                            type-hint-args)))]
     (if (= (count mv) 1)
       (call-exp (first mv))
       (map (fn [{:keys [return method method-args] :as def}]
