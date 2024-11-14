@@ -175,6 +175,23 @@
          m-list)
     m-list))
 
+(defn build-multi-arity-fns [per-arity-methods]
+  (letfn [(make-fn-args [fn-args m-list]
+            (if (= 1 (count m-list)) ;; main class object
+              fn-args
+              (cons (first fn-args) ;; main class object
+                    (->> (count fn-args)
+                         dec
+                         range
+                         (map #(str "arg" %))))))]
+    (map #(let [proto (first %)
+                fn-args (make-fn-args (:fn-args proto) %)]
+            (pp/cl-format nil "[~{~A~^ ~}]~4T~{~A~^ ~}"
+                          fn-args
+                          (-> (update-body-args % fn-args)
+                              (make-fn-body))))
+         per-arity-methods)))
+
 (defn def-map->clj-def-str-list [m]
   (letfn [(make-fn-args [fn-args m-list]
             (if (= 1 (count m-list)) ;; main class object
@@ -184,16 +201,14 @@
                          dec
                          range
                          (map #(str "arg" %))))))]
+
     (map (fn [[fn def-list]]
            (let [grouped (group-by-n-args def-list)
                  [_ defs] (first grouped)
-                 proto-def (first defs)
-                 fn-args (make-fn-args (:fn-args proto-def) defs)]
-             (pp/cl-format nil "~%(defn ~A~%~3T([~{~A~^ ~}]~{~A~^ ~}))"
-                           (:fn proto-def)
-                           fn-args
-                           (-> (update-body-args defs fn-args)
-                               (make-fn-body)))))
+                 fn-name (:fn (first defs))]
+             (pp/cl-format nil "~%(defn ~A~%~3T~{(~A)~%~^ ~})"
+                           fn-name
+                           (build-multi-arity-fns (map second grouped)))))
          m)))
 
 (defn def-str-list->file [file classes str-list]
@@ -239,7 +254,7 @@
   (java->clojure-interface-file ["~/Work/automerge-java/lib/src/main/java/org/automerge/Document.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/Transaction.java"
                                  ;; Counter is package class!
-                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/Counter.java"
+                                 ;;"~/Work/automerge-java/lib/src/main/java/org/automerge/Counter.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/ChangeHash.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/Cursor.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/PatchLog.java"
