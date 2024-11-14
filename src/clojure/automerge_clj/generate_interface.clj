@@ -84,18 +84,23 @@
 (defn- group-by-n-args [methods]
   (group-by #(count (:fn-args %)) methods))
 
-(defn- args->type-check-exps [args]
-  (map (fn [[type arg]]
-         (if (contains? #{"int" "long" "float" "double" "short" "boolean" "char"}
-                        type)
-           (format "(%s? %s)" type arg)
-           (format "(instance? %s %s)" type arg)))
-       args))
+(defn- args->type-check-exps [{:keys [method-args constructor? static?] }]
+  (letfn [(type-check-exps [args]
+            (map (fn [[type arg]]
+                   (if (contains? #{"int" "long" "float" "double" "short" "boolean" "char"}
+                                  type)
+                     (format "(%s? %s)" type arg)
+                     (format "(instance? %s %s)" type arg)))
+                 args))]
+    (if (or constructor? static? (= (count method-args) 1)) ;; Suspicious! FIXME
+      (type-check-exps method-args)
+      (type-check-exps (rest method-args)))))
 
-(defn make-cond-exp [args]
-  (let [type-check-exps (args->type-check-exps args)]
-    (if (= type-check-exps 1)
-      type-check-exps
+(defn make-cond-exp [def]
+  (let [type-check-exps (args->type-check-exps def)]
+    (case (count type-check-exps)
+      0 nil
+      1 (first type-check-exps)
       (pp/cl-format nil "(and ~{~A~^ ~})" type-check-exps))))
 
 (defn args->type-hint-exps [args]
@@ -119,9 +124,10 @@
                             type-hint-args)))]
     (if (= (count mv) 1)
       [(call-exp (first mv))]
-      (map (fn [{:keys [return method method-args] :as def}]
-             (pp/cl-format nil "~%~3T~A ~A" (make-cond-exp method-args) (call-exp def)))
-           mv))))
+      [(pp/cl-format nil "~%~2T(cond~{~%~6T~A~A~})"
+                     (mapcat (fn [def]
+                               [(make-cond-exp def) (call-exp def)])
+                             mv))])))
 
 (defn- canonical-type [type]
   (cond (nil? type) "void"
