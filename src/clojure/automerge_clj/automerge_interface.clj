@@ -3,9 +3,9 @@
 ;;;
 
 (ns clojure.automerge-clj.automerge-interface
-        (:import [java.util Optional List HashMap Date Iterator ArrayList]
-                 [org.automerge ObjectId ObjectType ExpandMark
-Document Transaction ChangeHash Cursor PatchLog SyncState NewValue AmValue ObjectId Patch PatchAction Mark Prop]))
+      (:import [java.util Optional List HashMap Date Iterator ArrayList]
+               [org.automerge ObjectType ExpandMark
+                Document Transaction Counter ChangeHash Cursor PatchLog SyncState NewValue AmValue ObjectId Patch PatchAction Mark Prop NewValue$UInt NewValue$Null NewValue$Bytes NewValue$F64 NewValue$Str NewValue$Int NewValue$Timestamp NewValue$Bool NewValue$Counter AmValue$Str AmValue$Counter AmValue$Int AmValue$Unknown AmValue$Bytes AmValue$List AmValue$Text AmValue$F64 AmValue$UInt AmValue$Null AmValue$Map AmValue$Timestamp AmValue$Bool PatchAction$DeleteList PatchAction$SpliceText PatchAction$PutMap PatchAction$DeleteMap PatchAction$FlagConflict PatchAction$Mark PatchAction$Insert PatchAction$PutList PatchAction$Increment Prop$Index Prop$Key]))
 
 (defonce +object-type-map+ ObjectType/MAP)
 (defonce +object-type-list+ ObjectType/LIST)
@@ -16,682 +16,581 @@ Document Transaction ChangeHash Cursor PatchLog SyncState NewValue AmValue Objec
 (defonce +expand-mark-both+ ExpandMark/BOTH)
 (defonce +expand-mark-none+ ExpandMark/NONE)
 
+(defn short? [n]
+  (and (int? n)
+       (<= Short/MIN_VALUE n Short/MAX_VALUE)))
+
+(defn long? [n]
+  (and (int? n)
+       (or (< Integer/MAX_VALUE n)
+           (> Integer/MIN_VALUE n))))
+
 (defn array-instance? [c o]
   (and (-> o class .isArray)
        (= (-> o class .getComponentType)
           c)))
 
-;;; Class Document
-
-
-(defn ^Cursor document-make-cursor
-  ([^Document document obj index]
-   (.makeCursor document ^ObjectId obj ^Long (long index)))
-  ([^Document document obj index heads]
-   (.makeCursor document ^ObjectId obj ^Long (long index) ^"[[[Lorg.automerge.ChangeHash;" heads)))
-nil
-
-(defn ^Document document-fork
-  ([^Document document]
-   (.fork document))
-  ([^Document document arg1]
-  (cond (bytes? arg1)
-        (.fork document ^bytes arg1)
-        (array-instance? ChangeHash arg1)
-        (.fork document ^"[[[Lorg.automerge.ChangeHash;" arg1)
-        :else (throw (ex-info "Type error" {:arg1 arg1}))))
-  ([^Document document arg1 arg2]
-  (cond (and (array-instance? ChangeHash arg1) (bytes? arg2))
-        (.fork document ^"[[[Lorg.automerge.ChangeHash;" arg1 ^bytes arg2)
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2})))))
-nil
-
-(defn ^Document make-document
-  ([]
-   (Document.))
-  ([actor-id]
-   (Document. ^bytes actor-id)))
-nil
-
-(defn ^Optional document-generate-sync-message [^Document document sync-state]
-  (.generateSyncMessage document ^SyncState sync-state))
-nil
-
-(defn ^Optional document-text
-  ([^Document document obj]
-   (.text document ^ObjectId obj))
-  ([^Document document obj heads]
-   (.text document ^ObjectId obj ^"[[[Lorg.automerge.ChangeHash;" heads)))
-nil
-
-(defn ^List document-diff [^Document document before after]
-  (.diff document ^"[[[Lorg.automerge.ChangeHash;" before ^"[[[Lorg.automerge.ChangeHash;" after))
-nil
-
-(defn ^Long document-lookup-cursor-index
-  ([^Document document obj cursor]
-   (.lookupCursorIndex document ^ObjectId obj ^Cursor cursor))
-  ([^Document document obj cursor heads]
-   (.lookupCursorIndex document ^ObjectId obj ^Cursor cursor ^"[[[Lorg.automerge.ChangeHash;" heads)))
-nil
-
-(defn ^Document document-load [bytes]
-  (Document/load ^bytes bytes))
-nil
-
-(defn ^Optional document-get-object-type [^Document document obj]
-  (.getObjectType document ^ObjectId obj))
-nil
-
-(defn  document-apply-encoded-changes
-  ([^Document document changes]
-   (.applyEncodedChanges document ^bytes changes))
-  ([^Document document changes patch-log]
-   (.applyEncodedChanges document ^bytes changes ^PatchLog patch-log)))
-nil
-
-(defn ^Optional document-get-all
-  ([^Document document arg1 arg2]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2))
-        (.getAll document ^ObjectId arg1 ^String arg2)
-        (and (instance? ObjectId arg1) (integer? arg2))
-        (.getAll document ^ObjectId arg1 ^Integer (int arg2))
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2}))))
-  ([^Document document arg1 arg2 arg3]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2) (array-instance? ChangeHash arg3))
-        (.getAll document ^ObjectId arg1 ^String arg2 ^"[[[Lorg.automerge.ChangeHash;" arg3)
-        (and (instance? ObjectId arg1) (integer? arg2) (array-instance? ChangeHash arg3))
-        (.getAll document ^ObjectId arg1 ^Integer (int arg2) ^"[[[Lorg.automerge.ChangeHash;" arg3)
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
-nil
-
-(defn ^Optional document-get
-  ([^Document document arg1 arg2]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2))
-        (.get document ^ObjectId arg1 ^String arg2)
-        (and (instance? ObjectId arg1) (integer? arg2))
-        (.get document ^ObjectId arg1 ^Integer (int arg2))
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2}))))
-  ([^Document document arg1 arg2 arg3]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2) (array-instance? ChangeHash arg3))
-        (.get document ^ObjectId arg1 ^String arg2 ^"[[[Lorg.automerge.ChangeHash;" arg3)
-        (and (instance? ObjectId arg1) (integer? arg2) (array-instance? ChangeHash arg3))
-        (.get document ^ObjectId arg1 ^Integer (int arg2) ^"[[[Lorg.automerge.ChangeHash;" arg3)
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
-nil
-
-(defn ^Transaction document-start-transaction
-  ([^Document document]
-   (.startTransaction document))
-  ([^Document document patch-log]
-   (.startTransaction document ^PatchLog patch-log)))
-nil
-
-(defn ^bytes document-encode-changes-since [^Document document heads]
-  (.encodeChangesSince document ^"[[[Lorg.automerge.ChangeHash;" heads))
-nil
-
-(defn ^"[[[Lorg.automerge.ChangeHash;" document-get-heads [^Document document]
-  (.getHeads document))
-nil
-
-(defn  document-free [^Document document]
-  (.free document))
-nil
-
-(defn ^Transaction document-start-transaction-at [^Document document patch-log heads]
-  (.startTransactionAt document ^PatchLog patch-log ^"[[[Lorg.automerge.ChangeHash;" heads))
-nil
-
-(defn ^bytes document-save [^Document document]
-  (.save document))
-nil
-
-(defn  document-merge
-  ([^Document document other]
-   (.merge document ^Document other))
-  ([^Document document other patch-log]
-   (.merge document ^Document other ^PatchLog patch-log)))
-nil
-
-(defn ^Optional document-map-entries
-  ([^Document document obj]
-   (.mapEntries document ^ObjectId obj))
-  ([^Document document obj heads]
-   (.mapEntries document ^ObjectId obj ^"[[[Lorg.automerge.ChangeHash;" heads)))
-nil
-
-(defn ^Optional document-keys
-  ([^Document document obj]
-   (.keys document ^ObjectId obj))
-  ([^Document document obj heads]
-   (.keys document ^ObjectId obj ^"[[[Lorg.automerge.ChangeHash;" heads)))
-nil
-
-(defn ^Optional document-list-items
-  ([^Document document obj]
-   (.listItems document ^ObjectId obj))
-  ([^Document document obj heads]
-   (.listItems document ^ObjectId obj ^"[[[Lorg.automerge.ChangeHash;" heads)))
-nil
-
-(defn ^List document-make-patches [^Document document patch-log]
-  (.makePatches document ^PatchLog patch-log))
-nil
-
-(defn ^bytes document-get-actor-id [^Document document]
-  (.getActorId document))
-nil
-
-(defn ^Long document-length
-  ([^Document document obj]
-   (.length document ^ObjectId obj))
-  ([^Document document obj heads]
-   (.length document ^ObjectId obj ^"[[[Lorg.automerge.ChangeHash;" heads)))
-nil
-
-(defn ^List document-marks
-  ([^Document document obj]
-   (.marks document ^ObjectId obj))
-  ([^Document document obj heads]
-   (.marks document ^ObjectId obj ^"[[[Lorg.automerge.ChangeHash;" heads)))
-nil
-
-(defn ^HashMap document-get-marks-at-index
-  ([^Document document obj index]
-   (.getMarksAtIndex document ^ObjectId obj ^Integer (int index)))
-  ([^Document document obj index heads]
-   (.getMarksAtIndex document ^ObjectId obj ^Integer (int index) ^"[[[Lorg.automerge.ChangeHash;" heads)))
-nil
-
-(defn  document-receive-sync-message
-  ([^Document document sync-state message]
-   (.receiveSyncMessage document ^SyncState sync-state ^bytes message))
-  ([^Document document sync-state patch-log message]
-   (.receiveSyncMessage document ^SyncState sync-state ^PatchLog patch-log ^bytes message)))
-nil
-;;; Class Transaction
-
-
-(defn ^ObjectId transaction-set
-  ([^Transaction transaction arg1 arg2 arg3]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2) (instance? String arg3))
-        (.set transaction ^ObjectId arg1 ^String arg2 ^String arg3)
-        (and (instance? ObjectId arg1) (integer? arg2) (instance? String arg3))
-        (.set transaction ^ObjectId arg1 ^Long (long arg2) ^String arg3)
-        (and (instance? ObjectId arg1) (instance? String arg2) (double? arg3))
-        (.set transaction ^ObjectId arg1 ^String arg2 ^Double (double arg3))
-        (and (instance? ObjectId arg1) (integer? arg2) (double? arg3))
-        (.set transaction ^ObjectId arg1 ^Long (long arg2) ^Double (double arg3))
-        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3))
-        (.set transaction ^ObjectId arg1 ^Long (long arg2) ^Integer (int arg3))
-        (and (instance? ObjectId arg1) (instance? String arg2) (integer? arg3))
-        (.set transaction ^ObjectId arg1 ^String arg2 ^Integer (int arg3))
-        (and (instance? ObjectId arg1) (instance? String arg2) (instance? NewValue arg3))
-        (.set transaction ^ObjectId arg1 ^String arg2 ^NewValue arg3)
-        (and (instance? ObjectId arg1) (integer? arg2) (instance? NewValue arg3))
-        (.set transaction ^ObjectId arg1 ^Long (long arg2) ^NewValue arg3)
-        (and (instance? ObjectId arg1) (instance? String arg2) (bytes? arg3))
-        (.set transaction ^ObjectId arg1 ^String arg2 ^bytes arg3)
-        (and (instance? ObjectId arg1) (integer? arg2) (bytes? arg3))
-        (.set transaction ^ObjectId arg1 ^Long (long arg2) ^bytes arg3)
-        (and (instance? ObjectId arg1) (instance? String arg2) (boolean? arg3))
-        (.set transaction ^ObjectId arg1 ^String arg2 ^Boolean (boolean arg3))
-        (and (instance? ObjectId arg1) (integer? arg2) (boolean? arg3))
-        (.set transaction ^ObjectId arg1 ^Long (long arg2) ^Boolean (boolean arg3))
-        (and (instance? ObjectId arg1) (instance? String arg2) (instance? Date arg3))
-        (.set transaction ^ObjectId arg1 ^String arg2 ^Date arg3)
-        (and (instance? ObjectId arg1) (integer? arg2) (instance? Date arg3))
-        (.set transaction ^ObjectId arg1 ^Long (long arg2) ^Date arg3)
-        (and (instance? ObjectId arg1) (instance? String arg2) (instance? ObjectType arg3))
-        (.set transaction ^ObjectId arg1 ^String arg2 ^ObjectType arg3)
-        (and (instance? ObjectId arg1) (integer? arg2) (instance? ObjectType arg3))
-        (.set transaction ^ObjectId arg1 ^Long (long arg2) ^ObjectType arg3)
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
-nil
-
-(defn  transaction-rollback [^Transaction transaction]
-  (.rollback transaction))
-nil
-
-(defn  transaction-mark-uint [^Transaction transaction obj start end mark-name value expand]
-  (.markUint transaction ^ObjectId obj ^Long (long start) ^Long (long end) ^String mark-name ^Long (long value) ^ExpandMark expand))
-nil
-
-(defn  transaction-mark-null [^Transaction transaction obj start end mark-name expand]
-  (.markNull transaction ^ObjectId obj ^Long (long start) ^Long (long end) ^String mark-name ^ExpandMark expand))
-nil
-
-(defn ^ObjectId transaction-insert
-  ([^Transaction transaction arg1 arg2 arg3]
-  (cond (and (instance? ObjectId arg1) (integer? arg2) (double? arg3))
-        (.insert transaction ^ObjectId arg1 ^Long (long arg2) ^Double (double arg3))
-        (and (instance? ObjectId arg1) (integer? arg2) (instance? String arg3))
-        (.insert transaction ^ObjectId arg1 ^Long (long arg2) ^String arg3)
-        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3))
-        (.insert transaction ^ObjectId arg1 ^Long (long arg2) ^Integer (int arg3))
-        (and (instance? ObjectId arg1) (integer? arg2) (bytes? arg3))
-        (.insert transaction ^ObjectId arg1 ^Long (long arg2) ^bytes arg3)
-        (and (instance? ObjectId arg1) (integer? arg2) (instance? Date arg3))
-        (.insert transaction ^ObjectId arg1 ^Long (long arg2) ^Date arg3)
-        (and (instance? ObjectId arg1) (integer? arg2) (boolean? arg3))
-        (.insert transaction ^ObjectId arg1 ^Long (long arg2) ^Boolean (boolean arg3))
-        (and (instance? ObjectId arg1) (integer? arg2) (instance? NewValue arg3))
-        (.insert transaction ^ObjectId arg1 ^Long (long arg2) ^NewValue arg3)
-        (and (instance? ObjectId arg1) (integer? arg2) (instance? ObjectType arg3))
-        (.insert transaction ^ObjectId arg1 ^Long (long arg2) ^ObjectType arg3)
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
-nil
-
-(defn  transaction-increment
-  ([^Transaction transaction arg1 arg2 arg3]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2) (integer? arg3))
-        (.increment transaction ^ObjectId arg1 ^String arg2 ^Long (long arg3))
-        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3))
-        (.increment transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3))
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
-nil
-
-(defn  transaction-splice [^Transaction transaction obj start delete-count items]
-  (.splice transaction ^ObjectId obj ^Long (long start) ^Long (long delete-count) ^Iterator items))
-nil
-
-(defn  transaction-splice-text [^Transaction transaction obj start delete-count text]
-  (.spliceText transaction ^ObjectId obj ^Long (long start) ^Long (long delete-count) ^String text))
-nil
-
-(defn  transaction-mark
-  ([^Transaction transaction arg1 arg2 arg3 arg4 arg5 arg6]
-  (cond (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3) (instance? String arg4) (instance? NewValue arg5) (instance? ExpandMark arg6))
-        (.mark transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3) ^String arg4 ^NewValue arg5 ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3) (instance? String arg4) (instance? String arg5) (instance? ExpandMark arg6))
-        (.mark transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3) ^String arg4 ^String arg5 ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3) (instance? String arg4) (integer? arg5) (instance? ExpandMark arg6))
-        (.mark transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3) ^String arg4 ^Long (long arg5) ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3) (instance? String arg4) (double? arg5) (instance? ExpandMark arg6))
-        (.mark transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3) ^String arg4 ^Double (double arg5) ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3) (instance? String arg4) (bytes? arg5) (instance? ExpandMark arg6))
-        (.mark transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3) ^String arg4 ^bytes arg5 ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3) (instance? String arg4) (instance? Date arg5) (instance? ExpandMark arg6))
-        (.mark transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3) ^String arg4 ^Date arg5 ^ExpandMark arg6)
-        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3) (instance? String arg4) (boolean? arg5) (instance? ExpandMark arg6))
-        (.mark transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3) ^String arg4 ^Boolean (boolean arg5) ^ExpandMark arg6)
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3, :arg4 arg4, :arg5 arg5, :arg6 arg6})))))
-nil
-
-(defn  transaction-insert-null [^Transaction transaction obj index]
-  (.insertNull transaction ^ObjectId obj ^Long (long index)))
-nil
-
-(defn  transaction-delete
-  ([^Transaction transaction arg1 arg2]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2))
-        (.delete transaction ^ObjectId arg1 ^String arg2)
-        (and (instance? ObjectId arg1) (integer? arg2))
-        (.delete transaction ^ObjectId arg1 ^Long (long arg2))
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2})))))
-nil
-
-(defn  transaction-set-uint
-  ([^Transaction transaction arg1 arg2 arg3]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2) (integer? arg3))
-        (.setUint transaction ^ObjectId arg1 ^String arg2 ^Long (long arg3))
-        (and (instance? ObjectId arg1) (integer? arg2) (integer? arg3))
-        (.setUint transaction ^ObjectId arg1 ^Long (long arg2) ^Long (long arg3))
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
-nil
-
-(defn  transaction-close [^Transaction transaction]
-  (.close transaction))
-nil
-
-(defn  transaction-insert-uint [^Transaction transaction obj index value]
-  (.insertUint transaction ^ObjectId obj ^Long (long index) ^Long (long value)))
-nil
-
-(defn  transaction-unmark [^Transaction transaction obj mark-name start end expand]
-  (.unmark transaction ^ObjectId obj ^String mark-name ^Long (long start) ^Long (long end) ^ExpandMark expand))
-nil
-
-(defn  transaction-set-null
-  ([^Transaction transaction arg1 arg2]
-  (cond (and (instance? ObjectId arg1) (instance? String arg2))
-        (.setNull transaction ^ObjectId arg1 ^String arg2)
-        (and (instance? ObjectId arg1) (integer? arg2))
-        (.setNull transaction ^ObjectId arg1 ^Long (long arg2))
-        :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2})))))
-nil
-
-(defn ^Optional transaction-commit [^Transaction transaction]
-  (.commit transaction))
-nil
-;;; Class ChangeHash
-
-
-(defn ^bytes change-hash-get-bytes [^ChangeHash changehash]
-  (.getBytes changehash))
-nil
-
-(defn ^Integer change-hash-hash-code [^ChangeHash changehash]
-  (.hashCode changehash))
-nil
-
-(defn ^Boolean change-hash-equals [^ChangeHash changehash obj]
-  (.equals changehash ^Object obj))
-nil
-;;; Class Cursor
-
-
-(defn ^Cursor cursor-from-bytes [encoded]
-  (Cursor/fromBytes ^bytes encoded))
-nil
-
-(defn ^Cursor cursor-from-string [encoded]
-  (Cursor/fromString ^String encoded))
-nil
-
-(defn ^String cursor-to-string [^Cursor cursor]
-  (.toString cursor))
-nil
-
-(defn ^bytes cursor-to-bytes [^Cursor cursor]
-  (.toBytes cursor))
-nil
-;;; Class PatchLog
-
-
-(defn ^PatchLog make-patch-log []
-  (PatchLog.))
-nil
-
-(defn  patch-log-free [^PatchLog patchlog]
-  (.free patchlog))
-nil
-;;; Class SyncState
-
-
-(defn ^SyncState make-sync-state []
-  (SyncState.))
-nil
-
-(defn ^SyncState sync-state-decode [encoded]
-  (SyncState/decode ^bytes encoded))
-nil
-
-(defn ^bytes sync-state-encode [^SyncState syncstate]
-  (.encode syncstate))
-nil
-
-(defn  sync-state-free [^SyncState syncstate]
-  (.free syncstate))
-nil
-
-(defn ^Boolean sync-state-is-in-sync [^SyncState syncstate doc]
-  (.isInSync syncstate ^Document doc))
-nil
-;;; Class NewValue
-
-
-(defn ^NewValue new-value-uint [value]
-  (NewValue/uint ^Long (long value)))
-nil
-
-(defn ^NewValue new-value-integer [value]
-  (NewValue/integer ^Long (long value)))
-nil
-
-(defn ^NewValue new-value-f64 [value]
-  (NewValue/f64 ^Double (double value)))
-nil
-
-(defn ^NewValue new-value-bool [value]
-  (NewValue/bool ^Boolean (boolean value)))
-nil
-
-(defn ^NewValue new-value-str [value]
-  (NewValue/str ^String value))
-nil
-
-(defn ^NewValue new-value-bytes [value]
-  (NewValue/bytes ^bytes value))
-nil
-
-(defn ^NewValue new-value-counter [value]
-  (NewValue/counter ^Long (long value)))
-nil
-
-(defn ^NewValue new-value-timestamp [value]
-  (NewValue/timestamp ^Date value))
-nil
-;;; Class AmValue
-
-
-(defn ^Long u-int-get-value [^AmValue amvalue]
-  (.getValue amvalue))
-
-(defn ^Long int-get-value [^AmValue amvalue]
-  (.getValue amvalue))
-
-(defn ^Boolean bool-get-value [^AmValue amvalue]
-  (.getValue amvalue))
-
-(defn ^bytes bytes-get-value [^AmValue amvalue]
-  (.getValue amvalue))
-
-(defn ^String str-get-value [^AmValue amvalue]
-  (.getValue amvalue))
-
-(defn ^Double f64-get-value [^AmValue amvalue]
-  (.getValue amvalue))
-
-(defn ^Long counter-get-value [^AmValue amvalue]
-  (.getValue amvalue))
-
-(defn ^Date timestamp-get-value [^AmValue amvalue]
-  (.getValue amvalue))
-
-(defn ^bytes unknown-get-value [^AmValue amvalue]
-  (.getValue amvalue))
-nil
-
-(defn ^String u-int-to-string [^AmValue amvalue]
-  (.toString amvalue))
-
-(defn ^String int-to-string [^AmValue amvalue]
-  (.toString amvalue))
-
-(defn ^String bool-to-string [^AmValue amvalue]
-  (.toString amvalue))
-
-(defn ^String bytes-to-string [^AmValue amvalue]
-  (.toString amvalue))
-
-(defn ^String str-to-string [^AmValue amvalue]
-  (.toString amvalue))
-
-(defn ^String f64-to-string [^AmValue amvalue]
-  (.toString amvalue))
-
-(defn ^String counter-to-string [^AmValue amvalue]
-  (.toString amvalue))
-
-(defn ^String timestamp-to-string [^AmValue amvalue]
-  (.toString amvalue))
-
-(defn ^String null-to-string [^AmValue amvalue]
-  (.toString amvalue))
-
-(defn ^String unknown-to-string [^AmValue amvalue]
-  (.toString amvalue))
-
-(defn ^String map-to-string [^AmValue amvalue]
-  (.toString amvalue))
-
-(defn ^String list-to-string [^AmValue amvalue]
-  (.toString amvalue))
-
-(defn ^String text-to-string [^AmValue amvalue]
-  (.toString amvalue))
-nil
-
-(defn ^Integer unknown-get-type-code [^AmValue amvalue]
-  (.getTypeCode amvalue))
-nil
-
-(defn ^ObjectId map-get-id [^AmValue amvalue]
-  (.getId amvalue))
-
-(defn ^ObjectId list-get-id [^AmValue amvalue]
-  (.getId amvalue))
-
-(defn ^ObjectId text-get-id [^AmValue amvalue]
-  (.getId amvalue))
-nil
-;;; Class ObjectId
-
-
-(defn ^Boolean object-id-is-root [^ObjectId objectid]
-  (.isRoot objectid))
-nil
-
-(defn ^String object-id-to-string [^ObjectId objectid]
-  (.toString objectid))
-nil
-
-(defn ^Integer object-id-hash-code [^ObjectId objectid]
-  (.hashCode objectid))
-nil
-
-(defn ^Boolean object-id-equals [^ObjectId objectid obj]
-  (.equals objectid ^Object obj))
-nil
-;;; Class Patch
-
-
-(defn ^ObjectId patch-get-obj [^Patch patch]
-  (.getObj patch))
-nil
-
-(defn ^ArrayList patch-get-path [^Patch patch]
-  (.getPath patch))
-nil
-
-(defn ^PatchAction patch-get-action [^Patch patch]
-  (.getAction patch))
-nil
-;;; Class PatchAction
-
-
-(defn ^Long delete-list-get-length [^PatchAction patchaction]
-  (.getLength patchaction))
-nil
-
-(defn ^String splice-text-get-text [^PatchAction patchaction]
-  (.getText patchaction))
-nil
-
-(defn ^String put-map-get-key [^PatchAction patchaction]
-  (.getKey patchaction))
-
-(defn ^String delete-map-get-key [^PatchAction patchaction]
-  (.getKey patchaction))
-nil
-
-(defn ^AmValue put-map-get-value [^PatchAction patchaction]
-  (.getValue patchaction))
-
-(defn ^AmValue put-list-get-value [^PatchAction patchaction]
-  (.getValue patchaction))
-
-(defn ^Long increment-get-value [^PatchAction patchaction]
-  (.getValue patchaction))
-nil
-
-(defn ^Boolean put-map-is-conflict [^PatchAction patchaction]
-  (.isConflict patchaction))
-
-(defn ^Boolean put-list-is-conflict [^PatchAction patchaction]
-  (.isConflict patchaction))
-nil
-
-(defn ^Prop increment-get-property [^PatchAction patchaction]
-  (.getProperty patchaction))
-
-(defn ^Prop flag-conflict-get-property [^PatchAction patchaction]
-  (.getProperty patchaction))
-nil
-
-(defn ^Long put-list-get-index [^PatchAction patchaction]
-  (.getIndex patchaction))
-
-(defn ^Long insert-get-index [^PatchAction patchaction]
-  (.getIndex patchaction))
-
-(defn ^Long splice-text-get-index [^PatchAction patchaction]
-  (.getIndex patchaction))
-
-(defn ^Long delete-list-get-index [^PatchAction patchaction]
-  (.getIndex patchaction))
-nil
-
-(defn ^"[[[Lorg.automerge.Mark;" mark-get-marks [^PatchAction patchaction]
-  (.getMarks patchaction))
-nil
-
-(defn ^ArrayList insert-get-values [^PatchAction patchaction]
-  (.getValues patchaction))
-nil
-;;; Class Mark
-
-
-(defn ^Long mark-get-start [^Mark mark]
-  (.getStart mark))
-nil
-
-(defn ^Long mark-get-end [^Mark mark]
-  (.getEnd mark))
-nil
-
-(defn ^String mark-get-name [^Mark mark]
-  (.getName mark))
-nil
-
-(defn ^AmValue mark-get-value [^Mark mark]
-  (.getValue mark))
-nil
-
-(defn ^String mark-to-string [^Mark mark]
-  (.toString mark))
-nil
-;;; Class Prop
-
-
-(defn ^Prop make-prop
-  ([^Prop prop arg1]
-  (cond (instance? String arg1)
-        (.Prop prop ^String arg1)
-        (integer? arg1)
-        (.Prop prop ^Long (long arg1))
-        :else (throw (ex-info "Type error" {:arg1 arg1})))))
-nil
-
-(defn ^String key-get-value [^Prop prop]
-  (.getValue prop))
-
-(defn ^Long index-get-value [^Prop prop]
-  (.getValue prop))
-nil
-
-(defn ^Integer key-hash-code [^Prop prop]
-  (.hashCode prop))
-
-(defn ^Integer index-hash-code [^Prop prop]
-  (.hashCode prop))
-nil
-
-(defn ^Boolean key-equals [^Prop prop obj]
-  (.equals prop ^Object obj))
-
-(defn ^Boolean index-equals [^Prop prop obj]
-  (.equals prop ^Object obj))
-nil
+(defn prop-equals
+   ([prop arg0]
+   (and (instance? Prop$Key prop) (instance? Object arg0)) 
+   ^boolean (.equals ^Prop$Key prop ^Object arg0) 
+   (and (instance? Prop$Index prop) (instance? Object arg0)) 
+   ^boolean (.equals ^Prop$Index prop ^Object arg0)))
+
+(defn mark-get-start
+   ([mark]
+   ^long (.getStart ^Mark mark)))
+
+(defn document-fork
+   ([document]
+   ^Document (.fork ^Document document)))
+
+(defn transaction-mark
+   ([transaction arg0 arg1 arg2 arg3 arg4 arg5]
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (long? arg2) (instance? String arg3) (instance? NewValue arg4) (instance? ExpandMark arg5)) 
+   ^void (.mark ^Transaction transaction ^ObjectId arg0 (long arg1) (long arg2) ^String arg3 ^NewValue arg4 ^ExpandMark arg5) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (long? arg2) (instance? String arg3) (instance? String arg4) (instance? ExpandMark arg5)) 
+   ^void (.mark ^Transaction transaction ^ObjectId arg0 (long arg1) (long arg2) ^String arg3 ^String arg4 ^ExpandMark arg5) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (long? arg2) (instance? String arg3) (long? arg4) (instance? ExpandMark arg5)) 
+   ^void (.mark ^Transaction transaction ^ObjectId arg0 (long arg1) (long arg2) ^String arg3 (long arg4) ^ExpandMark arg5) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (long? arg2) (instance? String arg3) (double? arg4) (instance? ExpandMark arg5)) 
+   ^void (.mark ^Transaction transaction ^ObjectId arg0 (long arg1) (long arg2) ^String arg3 (double arg4) ^ExpandMark arg5) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (long? arg2) (instance? String arg3) (instance? bytes arg4) (instance? ExpandMark arg5)) 
+   ^void (.mark ^Transaction transaction ^ObjectId arg0 (long arg1) (long arg2) ^String arg3 ^bytes arg4 ^ExpandMark arg5) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (long? arg2) (instance? String arg3) (instance? Counter arg4) (instance? ExpandMark arg5)) 
+   ^void (.mark ^Transaction transaction ^ObjectId arg0 (long arg1) (long arg2) ^String arg3 ^Counter arg4 ^ExpandMark arg5) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (long? arg2) (instance? String arg3) (instance? Date arg4) (instance? ExpandMark arg5)) 
+   ^void (.mark ^Transaction transaction ^ObjectId arg0 (long arg1) (long arg2) ^String arg3 ^Date arg4 ^ExpandMark arg5) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (long? arg2) (instance? String arg3) (boolean? arg4) (instance? ExpandMark arg5)) 
+   ^void (.mark ^Transaction transaction ^ObjectId arg0 (long arg1) (long arg2) ^String arg3 (boolean arg4) ^ExpandMark arg5)))
+
+(defn counter-get-value
+   ([counter]
+   ^long (.getValue ^Counter counter)))
+
+(defn new-value-f64
+   ([value]
+   ^NewValue (NewValue/f64 (double value))))
+
+(defn document-free
+   ([document]
+   ^void (.free ^Document document)))
+
+(defn patch-get-action
+   ([patch]
+   ^PatchAction (.getAction ^Patch patch)))
+
+(defn patch-get-path
+   ([patch]
+   ^ArrayList (.getPath ^Patch patch)))
+
+(defn transaction-unmark
+   ([transaction obj mark-name start end expand]
+   ^void (.unmark ^Transaction transaction ^ObjectId obj ^String mark-name (long start) (long end) ^ExpandMark expand)))
+
+(defn sync-state-decode
+   ([encoded]
+   ^SyncState (SyncState/decode ^bytes encoded)))
+
+(defn mark-get-name
+   ([mark]
+   ^String (.getName ^Mark mark)))
+
+(defn document-text
+   ([document obj]
+   ^Optional (.text ^Document document ^ObjectId obj)))
+
+(defn cursor-from-bytes
+   ([encoded]
+   ^Cursor (Cursor/fromBytes ^bytes encoded)))
+
+(defn document-get-marks-at-index
+   ([document obj index]
+   ^HashMap (.getMarksAtIndex ^Document document ^ObjectId obj (int index))))
+
+(defn object-id-is-root
+   ([object-id]
+   ^boolean (.isRoot ^ObjectId object-id)))
+
+(defn patch-action-get-value
+   ([patch-action]
+   (and (instance? PatchAction$PutMap patch-action)) 
+   ^AmValue (.getValue ^PatchAction$PutMap patch-action) 
+   (and (instance? PatchAction$PutList patch-action)) 
+   ^AmValue (.getValue ^PatchAction$PutList patch-action) 
+   (and (instance? PatchAction$Increment patch-action)) 
+   ^long (.getValue ^PatchAction$Increment patch-action)))
+
+(defn transaction-splice-text
+   ([transaction obj start delete-count text]
+   ^void (.spliceText ^Transaction transaction ^ObjectId obj (long start) (long delete-count) ^String text)))
+
+(defn transaction-mark-uint
+   ([transaction obj start end mark-name value expand]
+   ^void (.markUint ^Transaction transaction ^ObjectId obj (long start) (long end) ^String mark-name (long value) ^ExpandMark expand)))
+
+(defn change-hash-get-bytes
+   ([change-hash]
+   ^[:array-of byte] (.getBytes ^ChangeHash change-hash)))
+
+(defn document-start-transaction
+   ([document]
+   ^Transaction (.startTransaction ^Document document)))
+
+(defn patch-log-free
+   ([patch-log]
+   ^void (.free ^PatchLog patch-log)))
+
+(defn patch-action-get-index
+   ([patch-action]
+   (and (instance? PatchAction$PutList patch-action)) 
+   ^long (.getIndex ^PatchAction$PutList patch-action) 
+   (and (instance? PatchAction$Insert patch-action)) 
+   ^long (.getIndex ^PatchAction$Insert patch-action) 
+   (and (instance? PatchAction$SpliceText patch-action)) 
+   ^long (.getIndex ^PatchAction$SpliceText patch-action) 
+   (and (instance? PatchAction$DeleteList patch-action)) 
+   ^long (.getIndex ^PatchAction$DeleteList patch-action)))
+
+(defn document-merge
+   ([document other]
+   ^void (.merge ^Document document ^Document other)))
+
+(defn change-hash-equals
+   ([change-hash obj]
+   ^boolean (.equals ^ChangeHash change-hash ^Object obj)))
+
+(defn make-sync-state
+   ([]
+   ^SyncState (SyncState. )))
+
+(defn am-value-get-id
+   ([am-value]
+   (and (instance? AmValue$Map am-value)) 
+   ^ObjectId (.getId ^AmValue$Map am-value) 
+   (and (instance? AmValue$List am-value)) 
+   ^ObjectId (.getId ^AmValue$List am-value) 
+   (and (instance? AmValue$Text am-value)) 
+   ^ObjectId (.getId ^AmValue$Text am-value)))
+
+(defn document-start-transaction-at
+   ([document patch-log heads]
+   ^Transaction (.startTransactionAt ^Document document ^PatchLog patch-log ^"[Lorg.automerge.ChangeHash;" heads)))
+
+(defn document-get-actor-id
+   ([document]
+   ^[:array-of byte] (.getActorId ^Document document)))
+
+(defn cursor-from-string
+   ([encoded]
+   ^Cursor (Cursor/fromString ^String encoded)))
+
+(defn transaction-splice
+   ([transaction obj start delete-count items]
+   ^void (.splice ^Transaction transaction ^ObjectId obj (long start) (long delete-count) ^Iterator items)))
+
+(defn document-save
+   ([document]
+   ^[:array-of byte] (.save ^Document document)))
+
+(defn transaction-rollback
+   ([transaction]
+   ^void (.rollback ^Transaction transaction)))
+
+(defn am-value-to-string
+   ([am-value]
+   (and (instance? AmValue$UInt am-value)) 
+   ^String (.toString ^AmValue$UInt am-value) 
+   (and (instance? AmValue$Int am-value)) 
+   ^String (.toString ^AmValue$Int am-value) 
+   (and (instance? AmValue$Bool am-value)) 
+   ^String (.toString ^AmValue$Bool am-value) 
+   (and (instance? AmValue$Bytes am-value)) 
+   ^String (.toString ^AmValue$Bytes am-value) 
+   (and (instance? AmValue$Str am-value)) 
+   ^String (.toString ^AmValue$Str am-value) 
+   (and (instance? AmValue$F64 am-value)) 
+   ^String (.toString ^AmValue$F64 am-value) 
+   (and (instance? AmValue$Counter am-value)) 
+   ^String (.toString ^AmValue$Counter am-value) 
+   (and (instance? AmValue$Timestamp am-value)) 
+   ^String (.toString ^AmValue$Timestamp am-value) 
+   (and (instance? AmValue$Null am-value)) 
+   ^String (.toString ^AmValue$Null am-value) 
+   (and (instance? AmValue$Unknown am-value)) 
+   ^String (.toString ^AmValue$Unknown am-value) 
+   (and (instance? AmValue$Map am-value)) 
+   ^String (.toString ^AmValue$Map am-value) 
+   (and (instance? AmValue$List am-value)) 
+   ^String (.toString ^AmValue$List am-value) 
+   (and (instance? AmValue$Text am-value)) 
+   ^String (.toString ^AmValue$Text am-value)))
+
+(defn transaction-insert-null
+   ([transaction obj index]
+   ^void (.insertNull ^Transaction transaction ^ObjectId obj (long index))))
+
+(defn transaction-set
+   ([transaction arg0 arg1 arg2]
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (instance? String arg1) (instance? String arg2)) 
+   ^void (.set ^Transaction transaction ^ObjectId arg0 ^String arg1 ^String arg2) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (instance? String arg2)) 
+   ^void (.set ^Transaction transaction ^ObjectId arg0 (long arg1) ^String arg2) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (instance? String arg1) (double? arg2)) 
+   ^void (.set ^Transaction transaction ^ObjectId arg0 ^String arg1 (double arg2)) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (double? arg2)) 
+   ^void (.set ^Transaction transaction ^ObjectId arg0 (long arg1) (double arg2)) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (int? arg2)) 
+   ^void (.set ^Transaction transaction ^ObjectId arg0 (long arg1) (int arg2)) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (instance? String arg1) (int? arg2)) 
+   ^void (.set ^Transaction transaction ^ObjectId arg0 ^String arg1 (int arg2)) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (instance? String arg1) (instance? NewValue arg2)) 
+   ^void (.set ^Transaction transaction ^ObjectId arg0 ^String arg1 ^NewValue arg2) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (instance? NewValue arg2)) 
+   ^void (.set ^Transaction transaction ^ObjectId arg0 (long arg1) ^NewValue arg2) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (instance? String arg1) (instance? bytes arg2)) 
+   ^void (.set ^Transaction transaction ^ObjectId arg0 ^String arg1 ^bytes arg2) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (instance? bytes arg2)) 
+   ^void (.set ^Transaction transaction ^ObjectId arg0 (long arg1) ^bytes arg2) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (instance? String arg1) (boolean? arg2)) 
+   ^void (.set ^Transaction transaction ^ObjectId arg0 ^String arg1 (boolean arg2)) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (boolean? arg2)) 
+   ^void (.set ^Transaction transaction ^ObjectId arg0 (long arg1) (boolean arg2)) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (instance? String arg1) (instance? Counter arg2)) 
+   ^void (.set ^Transaction transaction ^ObjectId arg0 ^String arg1 ^Counter arg2) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (instance? Counter arg2)) 
+   ^void (.set ^Transaction transaction ^ObjectId arg0 (long arg1) ^Counter arg2) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (instance? String arg1) (instance? Date arg2)) 
+   ^void (.set ^Transaction transaction ^ObjectId arg0 ^String arg1 ^Date arg2) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (instance? Date arg2)) 
+   ^void (.set ^Transaction transaction ^ObjectId arg0 (long arg1) ^Date arg2) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (instance? String arg1) (instance? ObjectType arg2)) 
+   ^ObjectId (.set ^Transaction transaction ^ObjectId arg0 ^String arg1 ^ObjectType arg2) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (instance? ObjectType arg2)) 
+   ^ObjectId (.set ^Transaction transaction ^ObjectId arg0 (long arg1) ^ObjectType arg2)))
+
+(defn document-lookup-cursor-index
+   ([document obj cursor]
+   ^long (.lookupCursorIndex ^Document document ^ObjectId obj ^Cursor cursor)))
+
+(defn transaction-mark-null
+   ([transaction obj start end mark-name expand]
+   ^void (.markNull ^Transaction transaction ^ObjectId obj (long start) (long end) ^String mark-name ^ExpandMark expand)))
+
+(defn sync-state-encode
+   ([sync-state]
+   ^[:array-of byte] (.encode ^SyncState sync-state)))
+
+(defn document-generate-sync-message
+   ([document sync-state]
+   ^Optional (.generateSyncMessage ^Document document ^SyncState sync-state)))
+
+(defn patch-get-obj
+   ([patch]
+   ^ObjectId (.getObj ^Patch patch)))
+
+(defn new-value-integer
+   ([value]
+   ^NewValue (NewValue/integer (long value))))
+
+(defn am-value-get-value
+   ([am-value]
+   (and (instance? AmValue$UInt am-value)) 
+   ^long (.getValue ^AmValue$UInt am-value) 
+   (and (instance? AmValue$Int am-value)) 
+   ^long (.getValue ^AmValue$Int am-value) 
+   (and (instance? AmValue$Bool am-value)) 
+   ^boolean (.getValue ^AmValue$Bool am-value) 
+   (and (instance? AmValue$Bytes am-value)) 
+   ^[:array-of byte] (.getValue ^AmValue$Bytes am-value) 
+   (and (instance? AmValue$Str am-value)) 
+   ^String (.getValue ^AmValue$Str am-value) 
+   (and (instance? AmValue$F64 am-value)) 
+   ^double (.getValue ^AmValue$F64 am-value) 
+   (and (instance? AmValue$Counter am-value)) 
+   ^long (.getValue ^AmValue$Counter am-value) 
+   (and (instance? AmValue$Timestamp am-value)) 
+   ^Date (.getValue ^AmValue$Timestamp am-value) 
+   (and (instance? AmValue$Unknown am-value)) 
+   ^[:array-of byte] (.getValue ^AmValue$Unknown am-value)))
+
+(defn patch-action-get-property
+   ([patch-action]
+   (and (instance? PatchAction$Increment patch-action)) 
+   ^Prop (.getProperty ^PatchAction$Increment patch-action) 
+   (and (instance? PatchAction$FlagConflict patch-action)) 
+   ^Prop (.getProperty ^PatchAction$FlagConflict patch-action)))
+
+(defn patch-action-get-marks
+   ([patch-action]
+   ^[:array-of Mark] (.getMarks ^PatchAction$Mark patch-action)))
+
+(defn document-map-entries
+   ([document obj]
+   ^Optional (.mapEntries ^Document document ^ObjectId obj)))
+
+(defn document-load
+   ([bytes]
+   ^Document (Document/load ^bytes bytes)))
+
+(defn sync-state-is-in-sync
+   ([sync-state doc]
+   ^boolean (.isInSync ^SyncState sync-state ^Document doc)))
+
+(defn make-document
+   ([]
+   ^Document (Document. )))
+
+(defn transaction-close
+   ([transaction]
+   ^void (.close ^Transaction transaction)))
+
+(defn document-get-all
+   ([document arg0 arg1]
+   (and (instance? Document document) (instance? ObjectId arg0) (instance? String arg1)) 
+   ^Optional (.getAll ^Document document ^ObjectId arg0 ^String arg1) 
+   (and (instance? Document document) (instance? ObjectId arg0) (int? arg1)) 
+   ^Optional (.getAll ^Document document ^ObjectId arg0 (int arg1))))
+
+(defn document-receive-sync-message
+   ([document sync-state message]
+   ^void (.receiveSyncMessage ^Document document ^SyncState sync-state ^bytes message)))
+
+(defn new-value-uint
+   ([value]
+   ^NewValue (NewValue/uint (long value))))
+
+(defn document-marks
+   ([document obj]
+   ^List (.marks ^Document document ^ObjectId obj)))
+
+(defn cursor-to-bytes
+   ([cursor]
+   ^[:array-of byte] (.toBytes ^Cursor cursor)))
+
+(defn patch-action-get-text
+   ([patch-action]
+   ^String (.getText ^PatchAction$SpliceText patch-action)))
+
+(defn new-value-timestamp
+   ([value]
+   ^NewValue (NewValue/timestamp ^Date value)))
+
+(defn patch-action-get-length
+   ([patch-action]
+   ^long (.getLength ^PatchAction$DeleteList patch-action)))
+
+(defn mark-get-end
+   ([mark]
+   ^long (.getEnd ^Mark mark)))
+
+(defn object-id-to-string
+   ([object-id]
+   ^String (.toString ^ObjectId object-id)))
+
+(defn am-value-get-type-code
+   ([am-value]
+   ^int (.getTypeCode ^AmValue$Unknown am-value)))
+
+(defn object-id-hash-code
+   ([object-id]
+   ^int (.hashCode ^ObjectId object-id)))
+
+(defn transaction-insert
+   ([transaction arg0 arg1 arg2]
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (double? arg2)) 
+   ^void (.insert ^Transaction transaction ^ObjectId arg0 (long arg1) (double arg2)) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (instance? String arg2)) 
+   ^void (.insert ^Transaction transaction ^ObjectId arg0 (long arg1) ^String arg2) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (int? arg2)) 
+   ^void (.insert ^Transaction transaction ^ObjectId arg0 (long arg1) (int arg2)) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (instance? bytes arg2)) 
+   ^void (.insert ^Transaction transaction ^ObjectId arg0 (long arg1) ^bytes arg2) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (instance? Counter arg2)) 
+   ^void (.insert ^Transaction transaction ^ObjectId arg0 (long arg1) ^Counter arg2) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (instance? Date arg2)) 
+   ^void (.insert ^Transaction transaction ^ObjectId arg0 (long arg1) ^Date arg2) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (boolean? arg2)) 
+   ^void (.insert ^Transaction transaction ^ObjectId arg0 (long arg1) (boolean arg2)) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (instance? NewValue arg2)) 
+   ^void (.insert ^Transaction transaction ^ObjectId arg0 (long arg1) ^NewValue arg2) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (instance? ObjectType arg2)) 
+   ^ObjectId (.insert ^Transaction transaction ^ObjectId arg0 (long arg1) ^ObjectType arg2)))
+
+(defn mark-to-string
+   ([mark]
+   ^String (.toString ^Mark mark)))
+
+(defn object-id-equals
+   ([object-id obj]
+   ^boolean (.equals ^ObjectId object-id ^Object obj)))
+
+(defn new-value-bytes
+   ([value]
+   ^NewValue (NewValue/bytes ^bytes value)))
+
+(defn transaction-set-uint
+   ([transaction arg0 arg1 arg2]
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (instance? String arg1) (long? arg2)) 
+   ^void (.setUint ^Transaction transaction ^ObjectId arg0 ^String arg1 (long arg2)) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (long? arg2)) 
+   ^void (.setUint ^Transaction transaction ^ObjectId arg0 (long arg1) (long arg2))))
+
+(defn new-value-str
+   ([value]
+   ^NewValue (NewValue/str ^String value)))
+
+(defn prop-hash-code
+   ([prop]
+   (and (instance? Prop$Key prop)) 
+   ^int (.hashCode ^Prop$Key prop) 
+   (and (instance? Prop$Index prop)) 
+   ^int (.hashCode ^Prop$Index prop)))
+
+(defn make-patch-log
+   ([]
+   ^PatchLog (PatchLog. )))
+
+(defn make-counter
+   ([value]
+   ^Counter (Counter. (long value))))
+
+(defn sync-state-free
+   ([sync-state]
+   ^void (.free ^SyncState sync-state)))
+
+(defn document-make-patches
+   ([document patch-log]
+   ^List (.makePatches ^Document document ^PatchLog patch-log)))
+
+(defn new-value-bool
+   ([value]
+   ^NewValue (NewValue/bool (boolean value))))
+
+(defn document-get
+   ([document arg0 arg1]
+   (and (instance? Document document) (instance? ObjectId arg0) (instance? String arg1)) 
+   ^Optional (.get ^Document document ^ObjectId arg0 ^String arg1) 
+   (and (instance? Document document) (instance? ObjectId arg0) (int? arg1)) 
+   ^Optional (.get ^Document document ^ObjectId arg0 (int arg1))))
+
+(defn cursor-to-string
+   ([cursor]
+   ^String (.toString ^Cursor cursor)))
+
+(defn transaction-increment
+   ([transaction arg0 arg1 arg2]
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (instance? String arg1) (long? arg2)) 
+   ^void (.increment ^Transaction transaction ^ObjectId arg0 ^String arg1 (long arg2)) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1) (long? arg2)) 
+   ^void (.increment ^Transaction transaction ^ObjectId arg0 (long arg1) (long arg2))))
+
+(defn transaction-insert-uint
+   ([transaction obj index value]
+   ^void (.insertUint ^Transaction transaction ^ObjectId obj (long index) (long value))))
+
+(defn document-make-cursor
+   ([document obj index]
+   ^Cursor (.makeCursor ^Document document ^ObjectId obj (long index))))
+
+(defn new-value-counter
+   ([value]
+   ^NewValue (NewValue/counter (long value))))
+
+(defn make-prop
+   ([key]
+   (and (instance? String key)) 
+   ^Prop (Prop$Key. ^String key) 
+   (and (long? key)) 
+   ^Prop (Prop$Index. (long key))))
+
+(defn document-get-heads
+   ([document]
+   ^[:array-of ChangeHash] (.getHeads ^Document document)))
+
+(defn patch-action-is-conflict
+   ([patch-action]
+   (and (instance? PatchAction$PutMap patch-action)) 
+   ^boolean (.isConflict ^PatchAction$PutMap patch-action) 
+   (and (instance? PatchAction$PutList patch-action)) 
+   ^boolean (.isConflict ^PatchAction$PutList patch-action)))
+
+(defn document-length
+   ([document obj]
+   ^long (.length ^Document document ^ObjectId obj)))
+
+(defn document-keys
+   ([document obj]
+   ^Optional (.keys ^Document document ^ObjectId obj)))
+
+(defn counter-hash-code
+   ([counter]
+   ^int (.hashCode ^Counter counter)))
+
+(defn patch-action-get-key
+   ([patch-action]
+   (and (instance? PatchAction$PutMap patch-action)) 
+   ^String (.getKey ^PatchAction$PutMap patch-action) 
+   (and (instance? PatchAction$DeleteMap patch-action)) 
+   ^String (.getKey ^PatchAction$DeleteMap patch-action)))
+
+(defn document-get-object-type
+   ([document obj]
+   ^Optional (.getObjectType ^Document document ^ObjectId obj)))
+
+(defn document-diff
+   ([document before after]
+   ^List (.diff ^Document document ^"[Lorg.automerge.ChangeHash;" before ^"[Lorg.automerge.ChangeHash;" after)))
+
+(defn change-hash-hash-code
+   ([change-hash]
+   ^int (.hashCode ^ChangeHash change-hash)))
+
+(defn prop-get-value
+   ([prop]
+   (and (instance? Prop$Key prop)) 
+   ^String (.getValue ^Prop$Key prop) 
+   (and (instance? Prop$Index prop)) 
+   ^long (.getValue ^Prop$Index prop)))
+
+(defn transaction-commit
+   ([transaction]
+   ^Optional (.commit ^Transaction transaction)))
+
+(defn patch-action-get-values
+   ([patch-action]
+   ^ArrayList (.getValues ^PatchAction$Insert patch-action)))
+
+(defn document-apply-encoded-changes
+   ([document changes]
+   ^void (.applyEncodedChanges ^Document document ^bytes changes)))
+
+(defn counter-equals
+   ([counter obj]
+   ^boolean (.equals ^Counter counter ^Object obj)))
+
+(defn mark-get-value
+   ([mark]
+   ^AmValue (.getValue ^Mark mark)))
+
+(defn document-list-items
+   ([document obj]
+   ^Optional (.listItems ^Document document ^ObjectId obj)))
+
+(defn document-encode-changes-since
+   ([document heads]
+   ^[:array-of byte] (.encodeChangesSince ^Document document ^"[Lorg.automerge.ChangeHash;" heads)))
+
+(defn transaction-set-null
+   ([transaction arg0 arg1]
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (instance? String arg1)) 
+   ^void (.setNull ^Transaction transaction ^ObjectId arg0 ^String arg1) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1)) 
+   ^void (.setNull ^Transaction transaction ^ObjectId arg0 (long arg1))))
+
+(defn transaction-delete
+   ([transaction arg0 arg1]
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (instance? String arg1)) 
+   ^void (.delete ^Transaction transaction ^ObjectId arg0 ^String arg1) 
+   (and (instance? Transaction transaction) (instance? ObjectId arg0) (long? arg1)) 
+   ^void (.delete ^Transaction transaction ^ObjectId arg0 (long arg1))))
