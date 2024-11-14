@@ -122,20 +122,6 @@
   (when-let [val (optional->nilable optional)]
     val))
 
-(defn hydrate-crdt-value [am-value]
-  ((condp = (type am-value)
-     String identity
-     AmValue$UInt u-int-get-value
-     AmValue$Int int-get-value
-     AmValue$Bool bool-get-value
-     AmValue$Bytes bytes-get-value
-     AmValue$Str str-get-value
-     AmValue$F64 f64-get-value
-     AmValue$Counter counter-get-value
-     AmValue$Timestamp timestamp-get-value
-     AmValue$Unknown unknown-get-value)
-   am-value))
-
 (defrecord CrdtMap [doc id]
   CRDT
   (%crdt-get [this index]
@@ -163,7 +149,7 @@
   ([crdt index]
    (-> (%crdt-get crdt index)
        unwrap-crdt-optional
-       hydrate-crdt-value)))
+       am-value-get-value)))
 
 (defn- crdt-set [crdt tx pos val]
   (%crdt-set crdt tx pos val))
@@ -175,15 +161,17 @@
 
 (defn- make-crdt-instance
   ([doc am-value]
-   (condp =  (type am-value)
-     AmValue$Map (->CrdtMap doc (map-get-id am-value))
-     AmValue$List (->CrdtList doc (list-get-id am-value))
-     AmValue$Text (->CrdtText doc (text-get-id am-value))))
+   ((condp =  (type am-value)
+      AmValue$Map ->CrdtMap
+      AmValue$List ->CrdtList
+      AmValue$Text ->CrdtText)
+    doc (am-value-get-id am-value)))
   ([doc k obj-id]
-   (case k
-     :map (->CrdtMap doc obj-id)
-     :list (->CrdtList doc obj-id)
-     :text (->CrdtText doc obj-id))))
+   ((case k
+      :map ->CrdtMap
+      :list ->CrdtList
+      :text ->CrdtText)
+    doc obj-id)))
 
 (defn hydrate-crdt-object [doc-b64-str name]
   (let [doc (-> (b64-str->decoded-bytes doc-b64-str)
