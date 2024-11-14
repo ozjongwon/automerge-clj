@@ -6,8 +6,8 @@
    [clojure.string :as str]
    [clojure.set :as set]
    [camel-snake-kebab.core :as csk])
-  (:import [org.automerge ChangeHash ;; To generate type hint for the array of ChangeHash
-            ]))
+  (:import [org.automerge ;; To generate type hint for the array of ChangeHash
+            ChangeHash Mark]))
 
 (defonce special-case-functions 
   "(defonce +object-type-map+ ObjectType/MAP)
@@ -132,7 +132,7 @@
                                         static? 1
                                         :else 2)]
               (pp/cl-format nil "~%~3T^~:[void~;~:*~A~] (~[~A.~;~A~;.~A~] ~{~A~^ ~})" 
-                            return
+                            (canonical-type return)
                             method-type-pos
                             method
                             type-hint-args)))]

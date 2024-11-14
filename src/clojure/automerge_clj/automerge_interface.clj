@@ -5,7 +5,7 @@
 (ns clojure.automerge-clj.automerge-interface
       (:import [java.util Optional List HashMap Date Iterator ArrayList]
                [org.automerge ObjectType ExpandMark
-                Document Transaction ChangeHash Cursor PatchLog SyncState NewValue AmValue ObjectId Patch PatchAction Mark Prop NewValue$Bytes NewValue$Int NewValue$Timestamp NewValue$Bool NewValue$Null NewValue$F64 NewValue$UInt NewValue$Counter NewValue$Str AmValue$Timestamp AmValue$Bool AmValue$Bytes AmValue$Int AmValue$UInt AmValue$Counter AmValue$Text AmValue$Map AmValue$F64 AmValue$Unknown AmValue$Str AmValue$Null AmValue$List PatchAction$PutMap PatchAction$Insert PatchAction$DeleteMap PatchAction$PutList PatchAction$Mark PatchAction$SpliceText PatchAction$DeleteList PatchAction$FlagConflict PatchAction$Increment Prop$Key Prop$Index]))
+                Document Transaction ChangeHash Cursor PatchLog SyncState NewValue AmValue ObjectId Patch PatchAction Mark Prop NewValue$Timestamp NewValue$Bool NewValue$F64 NewValue$Bytes NewValue$Counter NewValue$Null NewValue$UInt NewValue$Str NewValue$Int AmValue$Unknown AmValue$Timestamp AmValue$List AmValue$Text AmValue$Null AmValue$Counter AmValue$Str AmValue$UInt AmValue$Bytes AmValue$F64 AmValue$Map AmValue$Bool AmValue$Int PatchAction$FlagConflict PatchAction$DeleteMap PatchAction$Mark PatchAction$DeleteList PatchAction$Increment PatchAction$PutMap PatchAction$Insert PatchAction$SpliceText PatchAction$PutList Prop$Index Prop$Key]))
 
 (defonce +object-type-map+ ObjectType/MAP)
 (defonce +object-type-list+ ObjectType/LIST)
@@ -158,7 +158,7 @@
 
 (defn change-hash-get-bytes
    ([change-hash] 
-   ^[:array-of byte] (.getBytes ^ChangeHash change-hash))
+   ^bytes (.getBytes ^ChangeHash change-hash))
 )
 
 (defn document-start-transaction
@@ -221,7 +221,7 @@
 
 (defn document-get-actor-id
    ([document] 
-   ^[:array-of byte] (.getActorId ^Document document))
+   ^bytes (.getActorId ^Document document))
 )
 
 (defn cursor-from-string
@@ -236,7 +236,7 @@
 
 (defn document-save
    ([document] 
-   ^[:array-of byte] (.save ^Document document))
+   ^bytes (.save ^Document document))
 )
 
 (defn transaction-rollback
@@ -331,7 +331,7 @@
 
 (defn sync-state-encode
    ([sync-state] 
-   ^[:array-of byte] (.encode ^SyncState sync-state))
+   ^bytes (.encode ^SyncState sync-state))
 )
 
 (defn document-generate-sync-message
@@ -359,7 +359,7 @@
       (instance? AmValue$Bool am-value)
    ^boolean (.getValue ^AmValue$Bool am-value)
       (instance? AmValue$Bytes am-value)
-   ^[:array-of byte] (.getValue ^AmValue$Bytes am-value)
+   ^bytes (.getValue ^AmValue$Bytes am-value)
       (instance? AmValue$Str am-value)
    ^String (.getValue ^AmValue$Str am-value)
       (instance? AmValue$F64 am-value)
@@ -369,7 +369,7 @@
       (instance? AmValue$Timestamp am-value)
    ^Date (.getValue ^AmValue$Timestamp am-value)
       (instance? AmValue$Unknown am-value)
-   ^[:array-of byte] (.getValue ^AmValue$Unknown am-value)))
+   ^bytes (.getValue ^AmValue$Unknown am-value)))
 )
 
 (defn patch-action-get-property
@@ -383,7 +383,7 @@
 
 (defn patch-action-get-marks
    ([patch-action] 
-   ^[:array-of Mark] (.getMarks ^PatchAction$Mark patch-action))
+   ^"[Lorg.automerge.Mark;" (.getMarks ^PatchAction$Mark patch-action))
 )
 
 (defn document-map-entries
@@ -451,7 +451,7 @@
 
 (defn cursor-to-bytes
    ([cursor] 
-   ^[:array-of byte] (.toBytes ^Cursor cursor))
+   ^bytes (.toBytes ^Cursor cursor))
 )
 
 (defn patch-action-get-text
@@ -625,7 +625,7 @@
 
 (defn document-get-heads
    ([document] 
-   ^[:array-of ChangeHash] (.getHeads ^Document document))
+   ^"[Lorg.automerge.ChangeHash;" (.getHeads ^Document document))
 )
 
 (defn patch-action-is-conflict
@@ -715,7 +715,7 @@
 
 (defn document-encode-changes-since
    ([document heads] 
-   ^[:array-of byte] (.encodeChangesSince ^Document document ^"[Lorg.automerge.ChangeHash;" heads))
+   ^bytes (.encodeChangesSince ^Document document ^"[Lorg.automerge.ChangeHash;" heads))
 )
 
 (defn transaction-set-null
