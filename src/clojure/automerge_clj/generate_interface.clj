@@ -255,6 +255,7 @@
 ;;        (or (> x Integer/MAX_VALUE)
 ;;            (< x Integer/MIN_VALUE))))
 
+
 (defonce special-case-functions 
   "(defonce +object-type-map+ ObjectType/MAP)
 (defonce +object-type-list+ ObjectType/LIST)
@@ -264,6 +265,15 @@
 (defonce +expand-mark-after+ ExpandMark/AFTER)
 (defonce +expand-mark-both+ ExpandMark/BOTH)
 (defonce +expand-mark-none+ ExpandMark/NONE)
+
+(defn short? [n]
+  (and (int? n)
+       (<= Short/MIN_VALUE n Short/MAX_VALUE)))
+
+(defn long? [n]
+  (and (int? n)
+       (or (< Integer/MAX_VALUE n)
+           (> Integer/MIN_VALUE n))))
 
 (defn array-instance? [c o]
   (and (-> o class .isArray)
@@ -378,11 +388,39 @@
   ;;{:keys [return fn fn-args method method-args]}
   (group-by #(count (:fn-args %)) methods))
 
+;; (cond (nil? type) "void"
+;;       (symbol? type) (str "" type)
+
+;;       (= '[:array-of int] type)  "ints"
+;;       (= '[:array-of long] type) "longs"
+;;       (= '[:array-of float] type) "floats"
+;;       (= '[:array-of double] type) "dboubles"
+;;       (= '[:array-of short] type) "shorts"
+;;       (= '[:array-of boolean] type) "booleans"
+;;       (= '[:array-of byte] type) "bytes"        
+;;       (= '[:array-of char] type) "chars"
+;;       (= '[:array-of object] type) "objects"
+
+;;       (= (first type) :array-of)
+;;       (format "\"%s\"" (.getName (class (make-array (resolve (second type)) 0))))
+
+;;       :else (throw (ex-info "Unknown type" {:type type})))
+
+
+
+(defn- args->type-check-exps [args]
+  (map (fn [[type arg]]
+         (if (contains? #{"int" "long" "float" "double" "short" "boolean" "char"}
+                        type)
+           (format "(%s? %s)" type arg)
+           (format "(instance? %s %s)" type arg)))
+       args))
+
 (defn make-cond-exp [args]
-  (let [cond-exp (pp/cl-format nil "~:{ (instance? ~A ~A)~}" args)]
-    (if (= (count args) 1)
-      cond-exp
-      (str "(and" cond-exp ")"))))
+  (let [type-check-exps (args->type-check-exps args)]
+    (if (= type-check-exps 1)
+      type-check-exps
+      (pp/cl-format nil "(and ~{~A~^ ~})" type-check-exps))))
 
 (defn make-fn-body [mv]
   (letfn [(call-exp [{:keys [return method method-args constructor? static?]}]
@@ -405,12 +443,31 @@
              (pp/cl-format nil "~%~3T~A ~A" (make-cond-exp method-args) (call-exp def)))
            mv))))
 
+(defn- canonical-type [type]
+  (cond (nil? type) "void"
+        (symbol? type) (str "" type)
+
+        (= '[:array-of int] type)  "ints"
+        (= '[:array-of long] type) "longs"
+        (= '[:array-of float] type) "floats"
+        (= '[:array-of double] type) "dboubles"
+        (= '[:array-of short] type) "shorts"
+        (= '[:array-of boolean] type) "booleans"
+        (= '[:array-of byte] type) "bytes"        
+        (= '[:array-of char] type) "chars"
+        (= '[:array-of object] type) "objects"
+
+        (= (first type) :array-of)
+        (format "\"%s\"" (.getName (class (make-array (resolve (second type)) 0))))
+
+        :else (throw (ex-info "Unknown type" {:type type}))))
+
 (defn update-body-args [m-list new-args]
   (if new-args
     (map #(update % :method-args
                   (fn [old new]
                     (map (fn [[t a] na]
-                           [t na]) old new))
+                           [(canonical-type t) na]) old new))
                   new-args)
          m-list)
     m-list))
