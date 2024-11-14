@@ -7,7 +7,8 @@
                  [org.automerge/automerge "0.0.7"]
                  [camel-snake-kebab "0.4.3"]
                  [org.clojure/data.codec "0.1.1"]
-                 [clojure.java-time "1.4.2"]]
+                 [clojure.java-time "1.4.2"]
+                 [zprint "1.2.9"]]
   :repl-options {:init (do (import [org.automerge ObjectId Document Transaction])
                            ;; Loading Automerge shared library
                            (let [doc (Document.)]

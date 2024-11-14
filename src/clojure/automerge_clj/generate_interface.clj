@@ -5,7 +5,8 @@
    [clojure.pprint :as pp]
    [clojure.string :as str]
    [clojure.set :as set]
-   [camel-snake-kebab.core :as csk])
+   [camel-snake-kebab.core :as csk]
+   [zprint.core :as zp])
   (:import [org.automerge ;; To generate type hint for the array of ChangeHash
             ChangeHash Mark]))
 
@@ -138,7 +139,7 @@
                             type-hint-args)))]
     (if (= (count mv) 1)
       [(call-exp (first mv))]
-      [(pp/cl-format nil "~%~2T(cond~{~%~6T~A~A~})"
+      [(pp/cl-format nil "~%~2T(cond~{~%~6T~A~A~}~%~2T:else (throw (IllegalArgumentException. \"No method found!\")))"
                      (mapcat (fn [def]
                                [(make-cond-exp def) (call-exp def)])
                              mv))])))
@@ -212,19 +213,18 @@
          m)))
 
 (defn def-str-list->file [file classes str-list]
-  (with-open [o (io/writer file)]
-    (binding [*out* o]
-      (println ";;;\n;;; Generated file, do not edit\n;;;\n")
-      (pp/cl-format *out* "(ns clojure.automerge-clj.automerge-interface
+  (with-out-str 
+    (println ";;;\n;;; Generated file, do not edit\n;;;\n")
+    (pp/cl-format *out* "(ns clojure.automerge-clj.automerge-interface
       (:import [java.util Optional List HashMap Date Iterator ArrayList]
                [org.automerge ObjectType ExpandMark
                 ~{~A~^ ~}]))~2&~A~&"
-                    `(~@(map first classes)
-                      ~@(for [[c & sl] classes
-                              s sl]
-                          (str c "$" s)))
-                    special-case-functions)
-      (run! #(println %) str-list))))
+                  `(~@(map first classes)
+                    ~@(for [[c & sl] classes
+                            s sl]
+                        (str c "$" s)))
+                  special-case-functions)
+    (run! #(println %) str-list)))
 
 (defn java->clojure-interface-file [java-files clj-file]
   (run! #(sh/sh "bash" "-c" (str "cd src/python && source python-env/bin/activate && python3 parse-java.py " %))
