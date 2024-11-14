@@ -126,24 +126,6 @@
            (format "^%s %s" type arg)))
        args))
 
-(defn make-fn-body [mv]
-  (letfn [(call-exp [{:keys [return method method-args constructor? static?]}]
-            (let [type-hint-args (args->type-hint-exps method-args)
-                  method-type-pos (cond constructor? 0
-                                        static? 1
-                                        :else 2)]
-              (pp/cl-format nil "~%~3T^~:[void~;~:*~A~] (~[~A.~;~A~;.~A~] ~{~A~^ ~})" 
-                            (canonical-type return)
-                            method-type-pos
-                            method
-                            type-hint-args)))]
-    (if (= (count mv) 1)
-      [(call-exp (first mv))]
-      [(pp/cl-format nil "~%~2T(cond~{~%~6T~A~A~}~%~2T:else (throw (IllegalArgumentException. \"No method found!\")))"
-                     (mapcat (fn [def]
-                               [(make-cond-exp def) (call-exp def)])
-                             mv))])))
-
 (defn- canonical-type [type]
   (cond (nil? type) "void"
         (symbol? type) (str "" type)
@@ -165,6 +147,24 @@
             (println ">>>" type)))
 
         :else (throw (ex-info "Unknown type" {:type type}))))
+
+(defn make-fn-body [mv]
+  (letfn [(call-exp [{:keys [return method method-args constructor? static?]}]
+            (let [type-hint-args (args->type-hint-exps method-args)
+                  method-type-pos (cond constructor? 0
+                                        static? 1
+                                        :else 2)]
+              (pp/cl-format nil "~%~3T^~:[void~;~:*~A~] (~[~A.~;~A~;.~A~] ~{~A~^ ~})" 
+                            (canonical-type return)
+                            method-type-pos
+                            method
+                            type-hint-args)))]
+    (if (= (count mv) 1)
+      [(call-exp (first mv))]
+      [(pp/cl-format nil "~%~2T(cond~{~%~6T~A~A~}~%~2T:else (throw (IllegalArgumentException. \"No method found!\")))"
+                     (mapcat (fn [def]
+                               [(make-cond-exp def) (call-exp def)])
+                             mv))])))
 
 (defn update-body-args [m-list new-args]
   (if new-args
@@ -213,18 +213,20 @@
          m)))
 
 (defn def-str-list->file [file classes str-list]
-  (with-out-str 
-    (println ";;;\n;;; Generated file, do not edit\n;;;\n")
-    (pp/cl-format *out* "(ns clojure.automerge-clj.automerge-interface
+  (->> {:style :indented}
+       (zp/zprint-file-str (with-out-str
+                             (println ";;;\n;;; Generated file, do not edit\n;;;\n")
+                             (pp/cl-format *out* "(ns clojure.automerge-clj.automerge-interface
       (:import [java.util Optional List HashMap Date Iterator ArrayList]
                [org.automerge ObjectType ExpandMark
                 ~{~A~^ ~}]))~2&~A~&"
-                  `(~@(map first classes)
-                    ~@(for [[c & sl] classes
-                            s sl]
-                        (str c "$" s)))
-                  special-case-functions)
-    (run! #(println %) str-list)))
+                                           `(~@(map first classes)
+                                             ~@(for [[c & sl] classes
+                                                     s sl]
+                                                 (str c "$" s)))
+                                           special-case-functions)
+                             (run! #(println %) str-list)))
+       (spit file)))
 
 (defn java->clojure-interface-file [java-files clj-file]
   (run! #(sh/sh "bash" "-c" (str "cd src/python && source python-env/bin/activate && python3 parse-java.py " %))
