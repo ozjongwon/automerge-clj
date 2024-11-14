@@ -183,7 +183,7 @@
       (pp/cl-format *out* "(ns clojure.automerge-clj.automerge-interface
       (:import [java.util Optional List HashMap Date Iterator ArrayList]
                [org.automerge ObjectType ExpandMark
-                ~{~A~^ ~}]))~2&"
+                ~{~A~^ ~}]))~2&~A~&"
                     `(~@(map first classes)
                       ~@(for [[c & sl] classes
                               s sl]
@@ -219,7 +219,7 @@
   (java->clojure-interface-file ["~/Work/automerge-java/lib/src/main/java/org/automerge/Document.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/Transaction.java"
                                  ;; Counter is package class!
-                                 ;;"~/Work/automerge-java/lib/src/main/java/org/automerge/Counter.java"
+                                 "~/Work/automerge-java/lib/src/main/java/org/automerge/Counter.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/ChangeHash.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/Cursor.java"
                                  "~/Work/automerge-java/lib/src/main/java/org/automerge/PatchLog.java"

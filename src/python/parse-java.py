@@ -120,7 +120,7 @@ def format_clojure_list(type_info: Tuple[str, set, dict]) -> str:
                 constructor_name = f"{type_name}"
 
                 # Add the original name and formatted definition
-                lines.append(f"{type_name} => ({class_name} make-{pascal_to_kebab(constructor_name)} {type_name} ({param_str}) :constructor? true)")
+                lines.append(f"{class_name} => ({class_name} make-{pascal_to_kebab(constructor_name)} {type_name} ({param_str}) :constructor? true)")
 
     return '\n'.join(lines)
 
