@@ -47,6 +47,7 @@ def parse_java_file(java_filename: str) -> Optional[Tuple[str, dict[str, List[Tu
         methods = {}
         outer_class = None
         inner_class = None
+        inner_classes = set()
         type_name = None
 
         # Handle both ClassDeclaration and InterfaceDeclaration
@@ -56,6 +57,7 @@ def parse_java_file(java_filename: str) -> Optional[Tuple[str, dict[str, List[Tu
                 type_name = outer_class
             else:
                 inner_class = node.name
+                inner_classes.add(inner_class)
                 type_name = f"{outer_class}${inner_class}"
 
             # Process constructors only if it's a class
@@ -86,23 +88,23 @@ def parse_java_file(java_filename: str) -> Optional[Tuple[str, dict[str, List[Tu
 
                     methods[method_name] = methods.get(method_name, []) + [['method', type_name, params, return_type,
                                                                             outer_class, inner_class, static_p]]
-        return (outer_class, methods)
+        return (outer_class, inner_classes, methods)
 
     except Exception as e:
         print(f"Error processing file: {e}")
         return None
 
-def format_clojure_list(type_info: Tuple[str, dict]) -> str:
+def format_clojure_list(type_info: Tuple[str, set, dict]) -> str:
     """
     Format the parsed method information into Clojure-style lists.
     """
-    type_name, methods = type_info
+    type_name, inner_classes, methods = type_info
     lines = []
 
     lines.append(";; Auto-generated method definitions")
     lines.append(f";; From {type_name}.java\n")
 
-    lines.append(f"\n:java-name => {type_name}\n")
+    lines.append(f"\n:classes => ({' '.join([type_name] + list(inner_classes))})\n")
 
     for original_name, mdefs in methods.items():
         for kind, class_name, params, *method_only in mdefs:

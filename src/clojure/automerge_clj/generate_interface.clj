@@ -53,33 +53,33 @@
      :static? static?}))
 
 (defn def-file->build-fn-def-map [files]
-  (loop [[f & more-f] files
-         result {}]
+  (loop [[f & more-f] files def-map {} all-classes []]
     (if f
-      (recur more-f
-             (into result
-                   (with-open [reader (clojure.java.io/reader f)] ; Open the file for reading
-                     (let [reader (java.io.PushbackReader. reader)]
-                       (let [[k arrow tclass] (list  (read reader false :eof) (read reader false :eof) (read reader false :eof))]
-                         (assert (and (= :java-name k) (= '=> arrow) (symbol? tclass)) "File format must be valid")
-                         (loop [method (read reader false :eof)
-                                arrow (read reader false :eof)
-                                class-cljfn-return-args-opts (read reader false :eof)
-                                result {}]
-                           (if (= :eof method)
-                             result
-                             (let [[class clj-fn return args & opts] class-cljfn-return-args-opts]
-                               (assert (and (symbol? method) (= '=> arrow) tclass class clj-fn)
-                                       "Entry format must be valid")
-                               (->> opts
-                                    (clj-fn-entry method tclass class clj-fn return args)
-                                    (update result
-                                            clj-fn
-                                            (fnil conj []))
-                                    (recur (read reader false :eof)
-                                           (read reader false :eof)
-                                           (read reader false :eof)))))))))))
-      result)))
+      (let [[classes defs-map]
+            (with-open [reader (clojure.java.io/reader f)] ; Open the file for reading
+              (let [reader (java.io.PushbackReader. reader)]
+                (let [[k arrow [tclass & subclasses]]
+                      (list (read reader false :eof) (read reader false :eof) (read reader false :eof))]
+                  (assert (and (= :classes k) (= '=> arrow) (symbol? tclass)) "File format must be valid")
+                  (loop [method (read reader false :eof)
+                         arrow (read reader false :eof)
+                         class-cljfn-return-args-opts (read reader false :eof)
+                         result {}]
+                    (if (= :eof method)
+                      [(cons tclass subclasses) result]
+                      (let [[class clj-fn return args & opts] class-cljfn-return-args-opts]
+                        (assert (and (symbol? method) (= '=> arrow) tclass class clj-fn)
+                                "Entry format must be valid")
+                        (->> opts
+                             (clj-fn-entry method tclass class clj-fn return args)
+                             (update result
+                                     clj-fn
+                                     (fnil conj []))
+                             (recur (read reader false :eof)
+                                    (read reader false :eof)
+                                    (read reader false :eof)))))))))]
+        (recur more-f (into def-map defs-map) (conj all-classes classes)))
+      [all-classes def-map])))
 
 (defn- group-by-n-args [methods]
   (group-by #(count (:fn-args %)) methods))
@@ -112,13 +112,13 @@
                   method-type-pos (cond constructor? 0
                                         static? 1
                                         :else 2)]
-              (pp/cl-format nil "~%~3T^~:[void~;~:*~A~] (~[~A.~;~A~;.~A~] ~{~A ~^~})" 
+              (pp/cl-format nil "~%~3T^~:[void~;~:*~A~] (~[~A.~;~A~;.~A~] ~{~A~^ ~})" 
                             return
                             method-type-pos
                             method
                             type-hint-args)))]
     (if (= (count mv) 1)
-      (call-exp (first mv))
+      [(call-exp (first mv))]
       (map (fn [{:keys [return method method-args] :as def}]
              (pp/cl-format nil "~%~3T~A ~A" (make-cond-exp method-args) (call-exp def)))
            mv))))
@@ -169,35 +169,27 @@
                  [_ defs] (first grouped)
                  proto-def (first defs)
                  fn-args (make-fn-args (:fn-args proto-def) defs)]
-             [(pp/cl-format nil "~%(defn ~A~%~3T([~{~A~^ ~}]~{~A~^~}))"
-                            (:fn proto-def)
-                            fn-args
-                            (-> (update-body-args defs fn-args)
-                                (make-fn-body)))]))
+             (pp/cl-format nil "~%(defn ~A~%~3T([~{~A~^ ~}]~{~A~^ ~}))"
+                           (:fn proto-def)
+                           fn-args
+                           (-> (update-body-args defs fn-args)
+                               (make-fn-body)))))
          m)))
 
-(defn def-str-list->file [file str-list]
+(defn def-str-list->file [file classes str-list]
   (with-open [o (io/writer file)]
     (binding [*out* o]
       (println ";;;\n;;; Generated file, do not edit\n;;;\n")
-      ;; (pp/cl-format *out* "(ns clojure.automerge-clj.automerge-interface
-
-      ;; (:import [java.util Optional List HashMap Date Iterator ArrayList]
-      ;;      [org.automerge ObjectId ObjectType ExpandMark Conflicts
-      ;;       Document Transaction ChangeHash Cursor PatchLog SyncState NewValue
-      ;;       AmValue ObjectId Patch PatchAction Mark Prop Prop$Key Prop$Index
-      ;;       PatchAction$PutMap PatchAction$Increment PatchAction$FlagConflict
-      ;;       PatchAction$Mark PatchAction$PutList PatchAction$Insert PatchAction$SpliceText
-      ;;       PatchAction$DeleteList AmValue$Map AmValue$List AmValue$Text AmValue$UInt
-      ;;       AmValue$Int AmValue$Bool AmValue$Bytes AmValue$Str AmValue$F64 AmValue$Counter
-      ;;       AmValue$Timestamp AmValue$Null AmValue$Unknown Counter])
-      ;;   (:import [java.util Optional List HashMap Date Iterator ArrayList]
-      ;;            [org.automerge ObjectId ObjectType ExpandMark~%~{~A~^ ~}]))~2&~A~2&"
-      ;;               ;; FIXME
-      ;;               ;;                    classes-to-import
-      ;;               ;;                    special-case-functions
-      ;;               )
-      (run! #(apply println %) str-list))))
+      (pp/cl-format *out* "(ns clojure.automerge-clj.automerge-interface
+      (:import [java.util Optional List HashMap Date Iterator ArrayList]
+               [org.automerge ObjectType ExpandMark
+                ~{~A~^ ~}]))~2&"
+                    `(~@(map first classes)
+                      ~@(for [[c & sl] classes
+                              s sl]
+                          (str c "$" s)))
+                    special-case-functions)
+      (run! #(println %) str-list))))
 
 (defn java->clojure-interface-file [java-files clj-file]
   (run! #(sh/sh "bash" "-c" (str "cd src/python && source python-env/bin/activate && python3 parse-java.py " %))
@@ -207,11 +199,10 @@
                                         (str/split #"\.")
                                         first)]
                           (str "/tmp/" fname ".clj"))
-                       java-files)]
-    (->>  clj-files
-          def-file->build-fn-def-map
-          def-map->clj-def-str-list
-          (def-str-list->file clj-file))))
+                       java-files)
+        [classes def-map] (def-file->build-fn-def-map clj-files)]
+    (->>  (def-map->clj-def-str-list def-map)
+          (def-str-list->file clj-file classes))))
 
 
 
