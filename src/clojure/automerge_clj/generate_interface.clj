@@ -87,8 +87,8 @@
 (defn- args->type-check-exps [{:keys [method-args constructor? static?] }]
   (letfn [(type-check-exps [args]
             (map (fn [[type arg]]
-                   (if (contains? #{"int" "long" "float" "double" "short" "boolean" "char"}
-                                  type)
+                   (if (contains? #{"int" "long" "float" "double" "short"
+                                    "boolean" "char" "bytes"} type)
                      (format "(%s? %s)" type arg)
                      (format "(instance? %s %s)" type arg)))
                  args))]
