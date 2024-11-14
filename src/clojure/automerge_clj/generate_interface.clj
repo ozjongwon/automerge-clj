@@ -5,7 +5,10 @@
    [clojure.pprint :as pp]
    [clojure.string :as str]
    [clojure.set :as set]
-   [camel-snake-kebab.core :as csk]))
+   [camel-snake-kebab.core :as csk])
+  (:import [java.util Optional List HashMap Date Iterator ArrayList]
+           [org.automerge ObjectId ObjectType ExpandMark Conflicts
+            Document Transaction ChangeHash Cursor PatchLog SyncState NewValue AmValue ObjectId Patch PatchAction Mark Prop]))
 
 (defonce ^:dynamic *fout* nil)
 
@@ -35,7 +38,7 @@
         (= '[:array-of byte] type) "^bytes"
 
         (= (first type) :array-of)
-        (format "^\"%s\"" (.getName (class (make-array (resolve (second type)) 0 0 0))))
+        (format "^\"%s\"" (.getName (class (make-array (resolve (second type)) 0))))
 
         :else (throw (ex-info "Unknown type" {:type type}))))
 
@@ -334,11 +337,13 @@
                 fn-args
                 (cons (csk/->kebab-case-string tclass) fn-args))
      :method (if static?
-               (str (csk/->kebab-case-string class) "/" method)
+               (str class "/" method)
                method)
      :method-args (if (or constructor? static?)
                     args
-                    (cons [class (csk/->kebab-case-string tclass)] args))}))
+                    (cons [class (csk/->kebab-case-string tclass)] args))
+     :constructor? constructor?
+     :static? static?}))
 
 (defn def-file->build-fn-def-map [files]
   (loop [[f & more-f] files
@@ -369,6 +374,73 @@
                                            (read reader false :eof)))))))))))
       result)))
 
+(defn- group-by-n-args [methods]
+  ;;{:keys [return fn fn-args method method-args]}
+  (group-by #(count (:fn-args %)) methods))
+
+(defn make-cond-exp [args]
+  (let [cond-exp (pp/cl-format nil "~:{ (instance? ~A ~A)~}" args)]
+    (if (= (count args) 1)
+      cond-exp
+      (str "(and" cond-exp ")"))))
+
+(defn make-fn-body [mv]
+  (letfn [(call-exp [{:keys [return method method-args constructor? static?]}]
+            (let [method-type-pos (cond constructor? 0
+                                        static? 1
+                                        :else 2)]
+              (if return
+                (pp/cl-format nil "~%~3T^~A (~[~A.~;~A~;.~A~] ~{~A ~^~})" 
+                              return
+                              method-type-pos
+                              method
+                              method-args)
+                (pp/cl-format nil "~%~3T (~:[.~A~;~A.~;.~A~] ~{~A ~^~})" 
+                              method-type-pos
+                              method
+                              method-args))))]
+    (if (= (count mv) 1)
+      (call-exp (first mv))
+      (map (fn [{:keys [return method method-args] :as def}]
+             (pp/cl-format nil "~%~3T~A ~A" (make-cond-exp method-args) (call-exp def)))
+           mv))))
+
+(defn update-body-args [m-list new-args]
+  (if new-args
+    (map #(update % :method-args
+                  (fn [old new]
+                    (map (fn [[t a] na]
+                           [t na]) old new))
+                  new-args)
+         m-list)
+    m-list))
+
+(defn def-map->clj-def-str-list [m]
+  (letfn [(make-fn-args [fn-args m-list]
+            (if (= 1 (count m-list)) ;; main class object
+              fn-args
+              (cons (first fn-args) ;; main class object
+                    (->> (count fn-args)
+                         dec
+                         range
+                         (map #(str "arg" %))))))]
+    (map (fn [[fn def-list]]
+           (let [grouped (group-by-n-args def-list)
+                 [_ defs] (first grouped)
+                 proto-def (first defs)
+                 fn-args (make-fn-args (:fn-args proto-def) defs)]
+             [(pp/cl-format nil "~%(defn ~A~%~3T([~{~A~^ ~}]~{~A~^~}))"
+                            (:fn proto-def)
+                            fn-args
+                            (-> (update-body-args defs fn-args)
+                                (make-fn-body)))]))
+         m)))
+
+(defn def-str-list->file [file str-list]
+  (with-open [o (io/writer file)]
+    (binding [*out* o]
+      (run! #(apply println %) str-list))))
+
 (defn java->clojure-interface-file [java-files clj-file]
   (run! #(sh/sh "bash" "-c" (str "cd src/python && source python-env/bin/activate && python3 parse-java.py " %))
         java-files)
@@ -380,11 +452,13 @@
                        java-files)]
     (->>  clj-files
           def-file->build-fn-def-map
-          ;; def-map->clj-def-str-list
-          ;; def-str-list->file
-          )))
+          def-map->clj-def-str-list
+          (def-str-list->file clj-file))))
+
+
 
 (comment
+
   (defn array-instance? [c o]
     (and (-> o class .isArray)
          (= (-> o class .getComponentType)
@@ -414,5 +488,47 @@
 
                                  ]
                                 "src/clojure/automerge_clj/automerge_interface.clj")
-  )
 
+
+
+
+  (set! *warn-on-reflection* true)
+  (set! *print-meta* true)
+  (let [^String s (apply str "hello")] (.charAt s 3))
+  (let [s ^String (apply str "hello")] (.charAt s 3))
+
+  (loop [i 0 c 0]
+    (if (== i 5)
+      c
+      (recur (inc i) (apply + i [c]))))
+
+  (defn sqrt-long ^Double [^Long n]
+    (Math/sqrt n))
+  (meta (-> (meta #'sqrt-long) :arglists first))
+
+  (defn sqrt-long ^double [^long n]
+    (Math/sqrt n))
+  (meta (-> (meta #'sqrt-long) :arglists first))
+
+  (.getName (class (make-array String 1 2 3)))
+  (.getName (class (make-array Integer/TYPE 1  2 3)))
+
+  (let [arr ^longs (make-array Long/TYPE 3)
+        c (aget arr 1)]
+    (aset arr 0 ^long c))
+
+  (defn ^Optional document-get-all
+    ([^Document document arg1 arg2]
+     (cond (and (instance? ObjectId arg1) (instance? String arg2))
+           (.getAll document ^ObjectId arg1 ^String arg2)
+           (and (instance? ObjectId arg1) (integer? arg2))
+           (.getAll document ^ObjectId arg1 ^Integer (int arg2))
+           :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2}))))
+    ([^Document document arg1 arg2 arg3]
+     (cond (and (instance? ObjectId arg1) (instance? String arg2) (array-instance? ChangeHash arg3))
+           (.getAll document ^ObjectId arg1 ^String arg2 ^"[Lorg.automerge.ChangeHash;" arg3)
+           (and (instance? ObjectId arg1) (integer? arg2) (array-instance? ChangeHash arg3))
+           (.getAll document ^ObjectId arg1 ^Integer (int arg2) ^"[Lorg.automerge.ChangeHash;" arg3)
+           :else (throw (ex-info "Type error" {:arg1 arg1, :arg2 arg2, :arg3 arg3})))))
+
+  )

@@ -109,7 +109,7 @@ def format_clojure_list(type_info: Tuple[str, dict]) -> str:
             if method_only:
                 return_type, outer_class, inner_class, static_p = method_only
                 param_str = ' '.join(f"[{param_type} {param_name}]" for param_type, param_name in params)
-                formatted_name = f"{pascal_to_kebab(outer_class)}-" + f"{pascal_to_kebab(original_name)}" if inner_class == None else f"{pascal_to_kebab(original_name)}"
+                formatted_name = f"{pascal_to_kebab(outer_class)}-" + f"{pascal_to_kebab(original_name)}"
                 # Add the original name and formatted definition
                 lines.append(f"{original_name} => ({class_name} {formatted_name} {return_type} ({param_str}) :static? {static_p})")
             else:
